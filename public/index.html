@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Ứng dụng luyện cờ vua game hóa cho trẻ em - Chess Training Gamification">
+    <title>♟️ Vương Quốc Cờ Vua — Chess Kingdom</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Chessboard CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+
+    <!-- App CSS -->
+    <link rel="stylesheet" href="/css/main.css">
+
+    <!-- Favicon -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♟</text></svg>">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Dynamic content loaded here by SPA router -->
+        <div class="loading-screen">
+            <div class="loading-content">
+                <div class="loading-icon">♟️</div>
+                <div class="loading-text">Đang tải Vương Quốc Cờ Vua...</div>
+                <div class="loading-bar">
+                    <div class="loading-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chess Libraries -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+    <!-- App JS -->
+    <script src="/js/api.js"></script>
+    <script src="/js/components/modal.js"></script>
+    <script src="/js/components/notifications.js"></script>
+    <script src="/js/components/chess-board-component.js"></script>
+    <script src="/js/pages/login.js"></script>
+    <script src="/js/pages/home.js"></script>
+    <script src="/js/pages/tower.js"></script>
+    <script src="/js/pages/puzzle.js"></script>
+    <script src="/js/pages/mountain.js"></script>
+    <script src="/js/pages/school.js"></script>
+    <script src="/js/pages/wheel.js"></script>
+    <script src="/js/pages/shop.js"></script>
+    <script src="/js/pages/hall.js"></script>
+    <script src="/js/pages/pond.js"></script>
+    <script src="/js/pages/dragon.js"></script>
+    <script src="/js/pages/garden.js"></script>
+    <script src="/js/pages/stats.js"></script>
+    <script src="/js/pages/admin/dashboard.js"></script>
+    <script src="/js/components/ui-enhancements.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+
+</html>

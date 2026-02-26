@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌍 Thế Giới — Chess Kingdom</title>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            font-family: 'Baloo 2', sans-serif;
+            color: #fff;
+        }
+
+        .world-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .world-header h1 {
+            font-size: 1.4rem;
+            margin: 0;
+        }
+
+        .world-header .back-btn {
+            background: rgba(255, 255, 255, 0.12);
+            border: none;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .world-header .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .world-header .stat-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .world-header .stat-pill {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        .world-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .world-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .world-tab {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.85rem;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.6);
+            transition: all 0.2s;
+        }
+
+        .world-tab.active {
+            background: linear-gradient(135deg, #6c5ce7, #a855f7);
+            color: #fff;
+        }
+
+        .villages-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .village-card {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s;
+        }
+
+        .village-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            border-color: rgba(108, 92, 231, 0.4);
+        }
+
+        .village-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6c5ce7, #a855f7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        .village-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .village-name {
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 2px;
+        }
+
+        .village-meta {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.5);
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .village-dragon {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 4px;
+        }
+
+        .village-dragon .dragon-hp {
+            color: #2ecc71;
+        }
+
+        .village-loot {
+            font-size: 0.8rem;
+            color: #f1c40f;
+            font-weight: 600;
+        }
+
+        .village-actions {
+            flex-shrink: 0;
+        }
+
+        .raid-btn {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            border: none;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .raid-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .raid-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .no-dragon-badge {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 12px;
+            border-radius: 8px;
+        }
+
+        .history-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .history-card {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.85rem;
+        }
+
+        .history-card .result-icon {
+            font-size: 1.5rem;
+        }
+
+        .history-card .result-text {
+            flex: 1;
+        }
+
+        .history-card .result-coins {
+            color: #f1c40f;
+            font-weight: 700;
+        }
+
+        .history-card .result-time {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .my-dragon-bar {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 12px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            justify-content: space-between;
+        }
+
+        .my-dragon-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .my-dragon-info .dragon-emoji {
+            font-size: 2rem;
+        }
+
+        .my-dragon-info .dragon-stats {
+            font-size: 0.85rem;
+        }
+
+        .hp-bar-bg {
+            width: 120px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.5s;
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+        }
+
+        .hp-bar-fill.low {
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+        }
+
+        .hp-bar-fill.mid {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+        }
+
+        .empty-world {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .empty-world .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 12px;
+        }
+
+        /* Battle overlay */
+        .battle-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            display: none;
+            flex-direction: column;
+        }
+
+        .battle-overlay.active {
+            display: flex;
+        }
+
+        .battle-arena {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .battle-fighters {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 60px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .fighter {
+            text-align: center;
+            position: relative;
+        }
+
+        .fighter-dragon {
+            width: 180px;
+            height: 180px;
+            transition: transform 0.3s;
+            filter: drop-shadow(0 0 20px rgba(108, 92, 231, 0.5));
+        }
+
+        .fighter-dragon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .fighter-dragon.attacking {
+            animation: attackShake 0.4s ease-out;
+        }
+
+        .fighter-dragon.hit {
+            animation: hitFlash 0.3s ease-out;
+        }
+
+        .fighter.right .fighter-dragon img {
+            transform: scaleX(-1);
+        }
+
+        .fighter.right .fighter-dragon.attacking img {
+            animation: attackShakeR 0.4s ease-out;
+        }
+
+        /* Shield badge */
+        .shield-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(52, 152, 219, 0.2);
+            border: 1px solid rgba(52, 152, 219, 0.4);
+            color: #3498db;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .regen-timer {
+            font-size: 0.75rem;
+            color: #2ecc71;
+            margin-top: 4px;
+        }
+
+        .fighter-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .fighter-level {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 8px;
+        }
+
+        .fight-hp-bar {
+            width: 180px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 0 auto 4px;
+            position: relative;
+        }
+
+        .fight-hp-fill {
+            height: 100%;
+            border-radius: 8px;
+            transition: width 0.5s ease;
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+        }
+
+        .fight-hp-text {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .damage-popup {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: #e74c3c;
+            opacity: 0;
+            animation: damageFloat 1s ease-out forwards;
+            pointer-events: none;
+        }
+
+        .damage-popup.crit {
+            color: #f1c40f;
+            font-size: 2rem;
+        }
+
+        .battle-log {
+            width: 100%;
+            max-width: 500px;
+            max-height: 120px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .battle-log .log-entry {
+            padding: 2px 0;
+        }
+
+        .battle-log .log-entry.crit {
+            color: #f1c40f;
+            font-weight: 700;
+        }
+
+        .battle-result {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .battle-result .result-title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .battle-result .result-sub {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 16px;
+        }
+
+        .battle-result .close-btn {
+            background: linear-gradient(135deg, #6c5ce7, #a855f7);
+            border: none;
+            color: white;
+            padding: 12px 32px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        @keyframes attackShake {
+            0% {
+                transform: translateX(0);
+            }
+
+            30% {
+                transform: translateX(30px);
+            }
+
+            100% {
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes attackShakeR {
+            0% {
+                transform: scaleX(-1) translateX(0);
+            }
+
+            30% {
+                transform: scaleX(-1) translateX(30px);
+            }
+
+            100% {
+                transform: scaleX(-1) translateX(0);
+            }
+        }
+
+        @keyframes hitFlash {
+            0% {
+                filter: brightness(3) drop-shadow(0 0 20px #e74c3c);
+            }
+
+            100% {
+                filter: drop-shadow(0 0 20px rgba(108, 92, 231, 0.5));
+            }
+        }
+
+        @keyframes damageFloat {
+            0% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-60px);
+            }
+        }
+
+        .battle-vs {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #e74c3c;
+            text-shadow: 0 0 30px rgba(231, 76, 60, 0.5);
+            animation: vsPulse 1s infinite;
+        }
+
+        @keyframes vsPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.15);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="world-header">
+        <button class="back-btn" onclick="window.location.href='/'">← Về Làng</button>
+        <h1>🌍 Thế Giới — Ra Ngoài Phiêu Lưu</h1>
+        <div class="stat-row">
+            <span class="stat-pill" id="world-coins">🪙 0</span>
+            <span class="stat-pill" id="world-stars">⭐ 0</span>
+        </div>
+    </div>
+
+    <div class="world-content">
+        <div id="my-dragon-section"></div>
+
+        <div class="world-tabs">
+            <button class="world-tab active" onclick="WorldPage.switchTab('villages', this)">🏘️ Các Làng</button>
+            <button class="world-tab" onclick="WorldPage.switchTab('arena', this)">🏟️ Đấu Trường</button>
+            <button class="world-tab" onclick="WorldPage.switchTab('history', this)">📜 Lịch Sử</button>
+        </div>
+
+        <div id="villages-tab"></div>
+        <div id="arena-tab" style="display:none"></div>
+        <div id="history-tab" style="display:none"></div>
+    </div>
+
+    <!-- Battle overlay (5v5 dynamic) -->
+    <div class="battle-overlay" id="battle-overlay">
+        <div class="battle-arena"
+            style="display:flex;gap:0;padding:0;max-width:100%;width:100%;height:100vh;overflow:hidden">
+            <!-- Main battle area -->
+            <div style="flex:1;display:flex;flex-direction:column;padding:12px;overflow-y:auto;min-width:0">
+                <div class="battle-header-bar"
+                    style="display:flex;justify-content:space-between;padding:6px 12px;margin-bottom:8px">
+                    <div id="battle-atk-label" style="font-weight:700;font-size:0.95rem"></div>
+                    <div style="font-size:1.3rem">⚔️</div>
+                    <div id="battle-def-label" style="font-weight:700;font-size:0.95rem;text-align:right"></div>
+                </div>
+                <div class="battle-5v5"
+                    style="display:flex;gap:24px;align-items:flex-start;justify-content:center;position:relative;flex:1">
+                    <div class="team-col" id="team-atk" style="display:flex;flex-direction:column;gap:4px;flex:1"></div>
+                    <div class="team-col" id="team-def" style="display:flex;flex-direction:column;gap:4px;flex:1"></div>
+                    <div id="fire-projectile"
+                        style="position:absolute;pointer-events:none;font-size:1.5rem;opacity:0;transition:all 0.4s ease;z-index:100">
+                    </div>
+                </div>
+                <!-- Result pinned at bottom of main area -->
+                <div class="battle-result" id="battle-result"
+                    style="display:none;margin-top:8px;text-align:center;padding:12px"></div>
+            </div>
+            <!-- Battle log sidebar -->
+            <div
+                style="width:260px;border-left:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;background:rgba(0,0,0,0.2);flex-shrink:0">
+                <div
+                    style="padding:8px 10px;font-weight:600;font-size:0.78rem;border-bottom:1px solid rgba(255,255,255,0.06);opacity:0.6">
+                    📜 Diễn biến trận đấu</div>
+                <div class="battle-log" id="battle-log" style="flex:1;overflow-y:auto;padding:4px 8px;font-size:0.7rem">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="battle-log" id="battle-log"
+        style="max-height:160px;overflow-y:auto;width:100%;max-width:800px;margin-top:12px;"></div>
+    <div class="battle-result" id="battle-result" style="display:none"></div>
+    </div>
+    </div>
+
+    <style>
+        .dragon-slot {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .dragon-slot.active {
+            border-color: #ffd200;
+            background: rgba(255, 210, 0, 0.12);
+            box-shadow: 0 0 12px rgba(255, 210, 0, 0.3);
+        }
+
+        .dragon-slot.ko {
+            opacity: 0.35;
+            filter: grayscale(1);
+        }
+
+        .dragon-slot.hit-flash {
+            animation: hitFlash5 0.4s ease-out;
+        }
+
+        .dragon-slot.attack-pulse {
+            animation: attackPulse5 0.4s ease-out;
+        }
+
+        .dragon-icon {
+            font-size: 1.4rem;
+            min-width: 32px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .dragon-slot.attack-pulse .dragon-icon {
+            transform: scale(1.3);
+        }
+
+        .dragon-info {
+            flex: 1;
+        }
+
+        .dragon-name {
+            font-weight: 700;
+            font-size: 0.72rem;
+        }
+
+        .dragon-elem {
+            font-size: 0.65rem;
+            opacity: 0.7;
+        }
+
+        .dragon-hp-bar {
+            height: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 3px;
+        }
+
+        .dragon-hp-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s;
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+        }
+
+        .dragon-hp-fill.low {
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+        }
+
+        .dragon-hp-fill.mid {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+        }
+
+        .dragon-hp-text {
+            font-size: 0.5rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        @keyframes hitFlash5 {
+            0% {
+                background: rgba(255, 50, 50, 0.3)
+            }
+
+            100% {
+                background: rgba(255, 255, 255, 0.05)
+            }
+        }
+
+        @keyframes attackPulse5 {
+            0% {
+                transform: scale(1)
+            }
+
+            50% {
+                transform: scale(1.05)
+            }
+
+            100% {
+                transform: scale(1)
+            }
+        }
+
+        .team-col.right .dragon-slot {
+            flex-direction: row-reverse;
+            text-align: right;
+        }
+    </style>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components/notifications.js"></script>
+    <script>
+        const WorldPage = {
+            myDragon: null,
+            regenInterval: null,
+
+            async init() {
+                try {
+                    const shopData = await API.get('/shop/items');
+                    document.getElementById('world-coins').textContent = `🪙 ${(shopData.balance?.coins || 0).toLocaleString()}`;
+                    document.getElementById('world-stars').textContent = `⭐ ${(shopData.balance?.stars || 0).toLocaleString()}`;
+
+                    const dragonData = await API.get('/dragon/me');
+                    this.myDragon = dragonData.dragon;
+                    this.renderMyDragon();
+                    this.loadVillages();
+                } catch (e) {
+                    console.error(e);
+                }
+            },
+
+            renderMyDragon() {
+                const sec = document.getElementById('my-dragon-section');
+                if (!this.myDragon) {
+                    sec.innerHTML = `<div class="my-dragon-bar"><span>⚠️ Bạn chưa có rồng! Hãy ấp trứng ở Hang Rồng trước.</span></div>`;
+                    return;
+                }
+                const d = this.myDragon;
+                const maxHp = d.total_hp || d.hp || 0;
+                const currentHp = d.current_hp || 0;
+                const totalAtt = d.total_att || d.att || 0;
+                const totalDef = d.total_def || d.def_stat || 0;
+                const hpPct = maxHp > 0 ? Math.round((currentHp / maxHp) * 100) : 0;
+                const hpClass = hpPct < 30 ? 'low' : hpPct < 60 ? 'mid' : '';
+
+                // Calculate regen timer
+                let regenHtml = '';
+                if (currentHp < maxHp && d.last_regen_at) {
+                    const lastRegen = new Date(d.last_regen_at).getTime();
+                    const nextRegen = lastRegen + 60000; // 1 minute
+                    const remainMs = nextRegen - Date.now();
+                    if (remainMs > 0) {
+                        const remainSec = Math.ceil(remainMs / 1000);
+                        const regenAmt = Math.max(1, Math.floor((d.hp || maxHp) * 0.01));
+                        regenHtml = `<div class="regen-timer">⏱️ Hồi +${regenAmt} HP sau ${remainSec}s (1%/phút)</div>`;
+                    }
+                } else if (currentHp < maxHp) {
+                    regenHtml = `<div class="regen-timer">⏱️ Tự hồi 1% HP mỗi phút</div>`;
+                }
+
+                sec.innerHTML = `
+            <div class="my-dragon-bar">
+                <div class="my-dragon-info">
+                    <img src="/img/dragons/dragon_${d.element || 'fire'}.png" style="width:60px;height:60px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(231,76,60,0.5));">
+                    <div class="dragon-stats">
+                        <div style="font-weight:700;">${d.name} — Lv.${d.level}</div>
+                        <div>❤️ ${currentHp}/${maxHp} HP &nbsp; ⚔️ ${totalAtt} ATT &nbsp; 🛡️ ${totalDef} DEF</div>
+                        ${regenHtml}
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div class="hp-bar-bg" style="width:150px;"><div class="hp-bar-fill ${hpClass}" style="width:${hpPct}%"></div></div>
+                    <span style="font-size:0.8rem;color:rgba(255,255,255,0.6);">${hpPct}%</span>
+                </div>
+            </div>
+        `;
+
+                // Auto-refresh regen timer
+                if (this.regenInterval) clearInterval(this.regenInterval);
+                if (currentHp < maxHp) {
+                    this.regenInterval = setInterval(() => this.renderMyDragon(), 10000);
+                }
+            },
+
+            async loadVillages() {
+                try {
+                    const data = await API.get('/world/villages');
+                    const container = document.getElementById('villages-tab');
+
+                    if (!data.villages || data.villages.length === 0) {
+                        container.innerHTML = `<div class="empty-world"><div class="empty-icon">🏜️</div><div>Chưa có làng nào khác</div></div>`;
+                        return;
+                    }
+
+                    container.innerHTML = `<div class="villages-grid">${data.villages.map(v => {
+                        const hasDragon = v.has_dragon;
+                        const hasShield = !!v.shield_until;
+                        const canRaid = this.myDragon && this.myDragon.current_hp > 0 && hasDragon && !hasShield;
+
+                        let shieldHtml = '';
+                        if (hasShield) {
+                            const remainMs = new Date(v.shield_until).getTime() - Date.now();
+                            if (remainMs > 0) {
+                                const remainMin = Math.ceil(remainMs / 60000);
+                                shieldHtml = `<div class="shield-badge">🛡️ Bảo vệ còn ${remainMin} phút</div>`;
+                            }
+                        }
+
+                        return `
+                    <div class="village-card">
+                        <div class="village-avatar">${(v.display_name || 'U')[0]}</div>
+                        <div class="village-info">
+                            <div class="village-name">${v.display_name}</div>
+                            <div class="village-meta">
+                                <span>📊 ${v.elo} ELO</span>
+                                <span>⭐ ${v.stars || 0}</span>
+                                <span>⛰️ Cấp ${v.milestone_level}</span>
+                            </div>
+                            ${shieldHtml}
+                        </div>
+                        <div class="village-actions">
+                            ${canRaid ? `<button class="raid-btn" onclick="WorldPage.startRaid(${v.user_id}, '${v.display_name.replace(/'/g, "\\\\'")}')" > ⚔️ Cướp Làng</button>` : hasShield ? `<button class="raid-btn" disabled>🛡️ Đang Bảo Vệ</button>` : !hasDragon ? `<span class="no-dragon-badge">Không có rồng</span>` : `<button class="raid-btn" disabled>⚔️ Cướp Làng</button>`}
+                        </div>
+                    </div>
+                `;
+                    }).join('')}</div>`;
+                } catch (e) {
+                    console.error(e);
+                    document.getElementById('villages-tab').innerHTML = '<div class="empty-world"><div class="empty-icon">⚠️</div><div>Lỗi tải danh sách</div></div>';
+                }
+            },
+
+            async loadHistory() {
+                try {
+                    const data = await API.get('/world/battle-history');
+                    const container = document.getElementById('history-tab');
+
+                    if (!data.battles || data.battles.length === 0) {
+                        container.innerHTML = '<div class="empty-world"><div class="empty-icon">📜</div><div>Chưa có trận chiến nào</div></div>';
+                        return;
+                    }
+
+                    container.innerHTML = `< div class="history-list" > ${data.battles.map(b => {
+                        const isAttacker = b.attacker_id === data.user_id;
+                        const won = b.winner_id === data.user_id;
+                        const d = new Date(b.created_at);
+                        const timeStr = `${d.getDate()}/${d.getMonth() + 1} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+                        return `
+                    <div class="history-card">
+                        <span class="result-icon">${won ? '🏆' : '💀'}</span>
+                        <div class="result-text">
+                            ${isAttacker ? `Bạn tấn công <b>${b.defender_name}</b>` : `<b>${b.attacker_name}</b> tấn công bạn`}
+                            — ${won ? '<span style="color:#2ecc71">Thắng</span>' : '<span style="color:#e74c3c">Thua</span>'}
+                        </div>
+                        ${b.coins_stolen > 0 ? `<span class="result-coins">${won && isAttacker ? '+' : '-'}${b.coins_stolen.toLocaleString()} 🪙</span>` : ''}
+                        <span class="result-time">${timeStr}</span>
+                    </div>
+                `;
+                    }).join('')
+                        }</div> `;
+                } catch (e) {
+                    document.getElementById('history-tab').innerHTML = '<div class="empty-world">Lỗi tải lịch sử</div>';
+                }
+            },
+
+            switchTab(tab, btn) {
+                document.querySelectorAll('.world-tab').forEach(t => t.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('villages-tab').style.display = tab === 'villages' ? '' : 'none';
+                document.getElementById('arena-tab').style.display = tab === 'arena' ? '' : 'none';
+                document.getElementById('history-tab').style.display = tab === 'history' ? '' : 'none';
+                if (tab === 'history') this.loadHistory();
+                if (tab === 'arena') this.loadArena();
+            },
+
+            async loadArena() {
+                const container = document.getElementById('arena-tab');
+                container.innerHTML = '<div style="text-align:center;padding:20px;opacity:0.5">Đang tải...</div>';
+                try {
+                    const [rankData, statusData] = await Promise.all([
+                        API.get('/arena/rankings'),
+                        API.get('/arena/my-status')
+                    ]);
+                    const rankings = rankData.rankings || [];
+                    const myRank = rankData.my_rank;
+                    const freeLeft = statusData.free_remaining;
+                    const used = statusData.challenges_used;
+                    const unclaimed = statusData.unclaimed_rewards;
+
+                    let html = '';
+                    // Unclaimed rewards banner
+                    if (unclaimed && (unclaimed.tickets > 0 || unclaimed.coins > 0)) {
+                        html += `<div style="background:linear-gradient(135deg,rgba(255,210,0,0.15),rgba(255,107,107,0.1));border:1px solid rgba(255,210,0,0.3);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+                            <div><span style="font-weight:700">🎁 Thưởng Đấu Trường:</span> +${unclaimed.tickets} 🎫 +${unclaimed.coins.toLocaleString()} 🪙</div>
+                            <button onclick="WorldPage.claimArenaRewards()" style="background:linear-gradient(135deg,#f7971e,#ffd200);color:#000;font-weight:700;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-family:inherit">Nhận</button>
+                        </div>`;
+                    }
+
+                    // Challenge status
+                    html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.05)">
+                        <div><span style="font-weight:700">⚔️ Lượt đấu hôm nay:</span> ${used}/5 free${used >= 5 ? ' · <span style="color:#f39c12">5,000🪙/lượt</span>' : ''}</div>
+                        <div style="font-size:0.85rem;opacity:0.6">${myRank ? `Hạng hiện tại: <b>#${myRank}</b>` : 'Chưa vào xếp hạng'}</div>
+                    </div>`;
+
+                    // Reward tiers
+                    html += `<div style="margin-bottom:12px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.03);font-size:0.75rem">
+                        <div style="font-weight:600;margin-bottom:4px;opacity:0.6">🏆 Thưởng mỗi 6h (Top 10)</div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                            <span>🥇5🎫 15k🪙</span> <span>🥈4🎫 10k🪙</span> <span>🥉3🎫 8k🪙</span> <span>#4 2🎫 5k🪙</span> <span>#5 2🎫 4k🪙</span>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">
+                            <span>#6 1🎫 3k🪙</span> <span>#7 1🎫 2k🪙</span> <span>#8 1🎫 1.5k🪙</span> <span>#9 1k🪙</span> <span>#10 500🪙</span>
+                        </div>
+                    </div>`;
+
+                    // Rankings list
+                    html += '<div style="display:flex;flex-direction:column;gap:4px">';
+                    for (const r of rankings) {
+                        const medals = ['🥇', '🥈', '🥉'];
+                        const rankDisplay = r.rank <= 3 ? medals[r.rank - 1] : `#${r.rank}`;
+                        const elemIcon = ELEM_ICONS[r.main_element] || '🐉';
+                        const elemColor = ELEM_COLORS[r.main_element] || '#999';
+                        const isMe = r.is_current_user;
+                        const canChallenge = !isMe && (myRank === null || r.rank < myRank);
+
+                        html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;
+                            background:${isMe ? 'rgba(46,204,113,0.12)' : 'rgba(255,255,255,0.04)'};
+                            border:${isMe ? '2px solid rgba(46,204,113,0.4)' : '1px solid rgba(255,255,255,0.06)'};
+                            transition:all 0.2s">
+                            <div style="width:36px;text-align:center;font-weight:800;font-size:${r.rank <= 3 ? '1.2rem' : '0.9rem'}">${rankDisplay}</div>
+                            <div style="width:28px;height:28px;border-radius:50%;background:${elemColor}20;display:flex;align-items:center;justify-content:center;font-size:1rem">${elemIcon}</div>
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:700;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                                    ${r.display_name} ${r.is_bot ? '<span style="font-size:0.6rem;opacity:0.4">🤖</span>' : ''}
+                                    ${isMe ? '<span style="color:#2ecc71;font-size:0.65rem"> (Bạn)</span>' : ''}
+                                </div>
+                                <div style="font-size:0.7rem;opacity:0.5">${r.dragon_count}🐉 · Lv.${r.max_level || '?'}</div>
+                            </div>
+                            ${canChallenge ? `<button onclick="WorldPage.challengeArena(${r.rank}, '${(r.display_name || '').replace(/'/g, "\\'")}')"
+                                style="background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.8rem;font-family:inherit;white-space:nowrap">⚔️ Đấu</button>` : ''}
+                        </div>`;
+                    }
+                    html += '</div>';
+                    container.innerHTML = html;
+                } catch (e) {
+                    container.innerHTML = `<div style="text-align:center;padding:20px;color:#e74c3c">${e.message}</div>`;
+                }
+            },
+
+            async challengeArena(targetRank, targetName) {
+                const statusData = await API.get('/arena/my-status');
+                const used = statusData.challenges_used;
+                let msg = `⚔️ Thách đấu hạng #${targetRank} (${targetName})?`;
+                if (used >= 5) msg += '\n\n💰 Tốn 5,000 xu (hết lượt free)';
+                if (!confirm(msg)) return;
+
+                try {
+                    const result = await API.post('/arena/challenge', { target_rank: targetRank });
+                    // Reuse BattleUI for animation
+                    BattleUI.play(result);
+                    // After battle, show arena result
+                    setTimeout(() => {
+                        const resultDiv = document.getElementById('battle-result');
+                        if (resultDiv) {
+                            const won = result.winner === 'attacker';
+                            let extra = '';
+                            if (won) extra = `<div style="margin-top:8px;font-size:0.9rem">📈 Hạng mới: <b>#${result.new_rank}</b></div>`;
+                            if (result.coins_spent > 0) extra += `<div style="font-size:0.75rem;opacity:0.5;margin-top:4px">-${result.coins_spent.toLocaleString()} 🪙</div>`;
+                            resultDiv.innerHTML = `
+                                <div class="result-title">${won ? '🏆 CHIẾN THẮNG!' : '💀 THẤT BẠI!'}</div>
+                                <div class="result-sub">${won ? `Chiếm hạng #${result.new_rank}!` : 'Giữ nguyên hạng!'}</div>
+                                ${extra}
+                                <button class="close-btn" onclick="BattleUI.close()">Đóng</button>
+                            `;
+                        }
+                    }, (result.battle_log?.length || 10) * 800 + 1000);
+                } catch (e) {
+                    Toast.error(e.message);
+                }
+            },
+
+            async claimArenaRewards() {
+                try {
+                    const result = await API.post('/arena/claim-rewards');
+                    Toast.success(result.message);
+                    this.loadArena();
+                } catch (e) {
+                    Toast.error(e.message);
+                }
+            },
+
+            async startRaid(defenderId, defenderName) {
+                if (!confirm(`⚔️ Bạn có chắc muốn cướp làng ${defenderName}?`)) return;
+
+                try {
+                    const result = await API.post('/world/raid', { defender_id: defenderId });
+                    BattleUI.play(result);
+                } catch (e) {
+                    Toast.error(e.message);
+                }
+            }
+        };
+
+        const ELEM_ICONS = { metal: '🪙', wood: '🌿', water: '💧', fire: '🔥', earth: '🪨', light: '✨', dark: '🌑' };
+        const ELEM_COLORS = { metal: '#C0C0C0', wood: '#2ECC71', water: '#3498DB', fire: '#E74C3C', earth: '#D4A574', light: '#F1C40F', dark: '#8E44AD' };
+        const FIRE_EMOJIS = { metal: '⚡', wood: '🍃', water: '🌊', fire: '🔥', earth: '🪨', light: '✨', dark: '🌑' };
+        const ELEM_NAMES = { metal: 'Kim', wood: 'Mộc', water: 'Thủy', fire: 'Hỏa', earth: 'Thổ', light: 'Á.Sáng', dark: 'B.Tối' };
+
+        const BattleUI = {
+            atkDragons: [], defDragons: [],
+
+            async play(result) {
+                const overlay = document.getElementById('battle-overlay');
+                overlay.classList.add('active');
+
+                // Set labels
+                document.getElementById('battle-atk-label').textContent = `🐉 ${result.attacker.name} `;
+                document.getElementById('battle-def-label').textContent = `🐲 ${result.defender.name} `;
+
+                // Build dragon lists from battle data
+                this.atkDragons = (result.atk_team || [{ name: result.attacker.dragon_name, element: result.attacker.element || 'fire', hp: result.attacker.max_hp, maxHp: result.attacker.max_hp, level: result.attacker.dragon_level }]);
+                this.defDragons = (result.def_team || [{ name: result.defender.dragon_name, element: result.defender.element || 'water', hp: result.defender.max_hp, maxHp: result.defender.max_hp, level: result.defender.dragon_level }]);
+
+                // Set initial HP — use startHp (pre-battle HP) for animation, not hp (post-battle)
+                this.atkDragons.forEach(d => { d.currentHp = d.startHp || d.maxHp; d.maxHp = d.maxHp || d.hp; });
+                this.defDragons.forEach(d => { d.currentHp = d.startHp || d.maxHp; d.maxHp = d.maxHp || d.hp; });
+
+                this.renderTeam('team-atk', this.atkDragons, 'atk');
+                this.renderTeam('team-def', this.defDragons, 'def');
+
+                // Clear
+                document.getElementById('battle-log').innerHTML = '';
+                document.getElementById('battle-result').style.display = 'none';
+                this._lastLogTurn = 0;
+
+                // Play turns
+                for (let i = 0; i < result.battle_log.length; i++) {
+                    const entry = result.battle_log[i];
+                    await this.delay(350);
+
+                    // Determine which side is attacking and which is defending this turn
+                    const attackerName = entry.attacker;
+                    const targetName = entry.target;
+                    let fromSide, toSide, fromIdx, toIdx, fromElem;
+
+                    if (entry.side === 'atk') {
+                        // Attacker team's dragon attacks defender team's dragon
+                        fromSide = 'atk';
+                        toSide = 'def';
+                        fromIdx = this.atkDragons.findIndex(d => d.name === attackerName);
+                        toIdx = this.defDragons.findIndex(d => d.name === targetName);
+                        if (fromIdx < 0) fromIdx = 0;
+                        if (toIdx < 0) toIdx = 0;
+                        fromElem = this.atkDragons[fromIdx]?.element || 'fire';
+                    } else {
+                        // Defender team's dragon attacks attacker team's dragon
+                        fromSide = 'def';
+                        toSide = 'atk';
+                        fromIdx = this.defDragons.findIndex(d => d.name === attackerName);
+                        toIdx = this.atkDragons.findIndex(d => d.name === targetName);
+                        if (fromIdx < 0) fromIdx = 0;
+                        if (toIdx < 0) toIdx = 0;
+                        fromElem = this.defDragons[fromIdx]?.element || 'water';
+                    }
+
+                    // Highlight attacker & fire projectile from correct dragon
+                    this.highlightSlot(fromSide, fromIdx, 'attack-pulse');
+                    await this.fireProjectile(fromSide, fromIdx, toSide, toIdx, fromElem);
+
+                    // Hit target
+                    this.highlightSlot(toSide, toIdx, 'hit-flash');
+                    this.showSlotDamage(toSide, toIdx, entry.damage, entry.crit);
+
+                    // Update HP on target
+                    const targetDragons = toSide === 'atk' ? this.atkDragons : this.defDragons;
+                    if (targetDragons[toIdx]) {
+                        targetDragons[toIdx].currentHp = Math.max(0, (targetDragons[toIdx].currentHp || 0) - entry.damage);
+                        this.updateSlotHp(toSide, toIdx);
+                    }
+
+                    const sideEmoji = entry.side === 'atk' ? '🐉' : '🐲';
+                    this.addLog(`${sideEmoji} ${attackerName} ${FIRE_EMOJIS[fromElem] || '🔥'} → ${targetName} -${entry.damage} HP${entry.crit ? ' 💥CRIT!' : ''}${entry.elemBonus ? ` [${entry.elemBonus > 0 ? '+' : ''}${entry.elemBonus}%]` : ''} `, entry.crit, entry.turn);
+
+                    await this.delay(400);
+                    document.querySelectorAll('.dragon-slot.attack-pulse, .dragon-slot.hit-flash').forEach(el => el.classList.remove('attack-pulse', 'hit-flash'));
+                }
+
+                // Result
+                await this.delay(500);
+                const won = result.winner === 'attacker';
+                const resultDiv = document.getElementById('battle-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+            <div class="result-title">${won ? '🏆 CHIẾN THẮNG!' : '💀 THẤT BẠI!'}</div>
+                    <div class="result-sub">${won && result.coins_stolen > 0 ? `Cướp được ${result.coins_stolen.toLocaleString()} 🪙!` : won ? 'Đối thủ không còn xu để cướp!' : 'Rồng của bạn đã chiến đấu dũng cảm!'}</div>
+                    <button class="close-btn" onclick="BattleUI.close()">Đóng</button>
+        `;
+            },
+
+
+            getDragonImage(element) {
+                return `/img/dragons/dragon_${element || 'fire'}.png`;
+            },
+
+            renderTeam(containerId, dragons, side) {
+                const container = document.getElementById(containerId);
+                if (side === 'def') container.classList.add('right');
+
+                // Separate front and back
+                const front = dragons.filter((d, i) => d.position === 'front');
+                const back = dragons.filter((d, i) => d.position === 'back');
+                // If no position info, first 2 front, rest back
+                if (front.length === 0 && back.length === 0) {
+                    dragons.forEach((d, i) => { d.position = i < 2 ? 'front' : 'back'; });
+                    front.push(...dragons.filter(d => d.position === 'front'));
+                    back.push(...dragons.filter(d => d.position === 'back'));
+                }
+
+                const renderRow = (rowDragons, rowLabel) => {
+                    if (rowDragons.length === 0) return '';
+                    return `<div style="margin-bottom:4px">
+                        <div style="font-size:0.55rem;opacity:0.4;margin-bottom:2px;text-align:${side === 'def' ? 'right' : 'left'}">${rowLabel}</div>
+                        <div style="display:flex;flex-direction:column;gap:3px">
+                            ${rowDragons.map(d => {
+                        const globalIdx = dragons.indexOf(d);
+                        const elem = d.element || 'fire';
+                        const elemColor = ELEM_COLORS[elem] || '#E74C3C';
+                        return `<div class="dragon-slot" id="${side}-slot-${globalIdx}" data-elem="${elem}">
+                                    <img src="${this.getDragonImage(elem)}" style="width:36px;height:36px;object-fit:contain;filter:drop-shadow(0 2px 4px ${elemColor}40)" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                    <div class="dragon-icon" style="color:${elemColor};display:none">${ELEM_ICONS[elem] || '🔥'}</div>
+                                    <div class="dragon-info">
+                                        <div class="dragon-name">${d.name} Lv.${d.level || '?'}</div>
+                                        <div class="dragon-elem" style="color:${elemColor}">${ELEM_ICONS[elem] || '🔥'} ${ELEM_NAMES[elem] || elem} · 💨${d.spd || '?'}</div>
+                                        <div class="dragon-hp-bar">
+                                            <div class="dragon-hp-fill" id="${side}-hp-${globalIdx}" style="width:100%"></div>
+                                        </div>
+                                        <div class="dragon-hp-text" id="${side}-hptext-${globalIdx}">${d.currentHp}/${d.maxHp}</div>
+                                    </div>
+                                </div>`;
+                    }).join('')}
+                        </div>
+                    </div>`;
+                };
+
+                container.innerHTML = renderRow(front, '⚔️ Tiền phong') + renderRow(back, '🛡️ Hậu vệ');
+            },
+
+            highlightSlot(side, idx, cls) {
+                const slot = document.getElementById(`${side}-slot-${idx}`);
+                if (slot) { slot.classList.add(cls); }
+            },
+
+            updateSlotHp(side, idx) {
+                const dragons = side === 'atk' ? this.atkDragons : this.defDragons;
+                const d = dragons[idx];
+                if (!d) return;
+                const pct = Math.max(0, Math.round((d.currentHp / d.maxHp) * 100));
+                const fill = document.getElementById(`${side}-hp-${idx}`);
+                if (fill) {
+                    fill.style.width = `${pct}%`;
+                    fill.className = 'dragon-hp-fill' + (pct < 30 ? ' low' : pct < 60 ? ' mid' : '');
+                }
+                const text = document.getElementById(`${side}-hptext-${idx}`);
+                if (text) text.textContent = `${Math.max(0, d.currentHp)}/${d.maxHp}`;
+
+                // KO state
+                if (d.currentHp <= 0) {
+                    const slot = document.getElementById(`${side}-slot-${idx}`);
+                    if (slot) slot.classList.add('ko');
+                }
+            },
+
+            showSlotDamage(side, idx, damage, crit) {
+                const slot = document.getElementById(`${side}-slot-${idx}`);
+                if (!slot) return;
+                const popup = document.createElement('div');
+                popup.className = `damage-popup${crit ? ' crit' : ''}`;
+                popup.textContent = `-${damage}`;
+                popup.style.position = 'absolute';
+                popup.style.right = side === 'atk' ? '10px' : 'auto';
+                popup.style.left = side === 'def' ? '10px' : 'auto';
+                popup.style.top = '0';
+                slot.appendChild(popup);
+                setTimeout(() => popup.remove(), 1000);
+            },
+
+            async fireProjectile(fromSide, fromIdx, toSide, toIdx, element) {
+                const fromSlot = document.getElementById(`${fromSide}-slot-${fromIdx}`);
+                const toSlot = document.getElementById(`${toSide}-slot-${toIdx}`);
+                const proj = document.getElementById('fire-projectile');
+                if (!fromSlot || !toSlot || !proj) return;
+
+                const fromRect = fromSlot.getBoundingClientRect();
+                const toRect = toSlot.getBoundingClientRect();
+                const arenaRect = document.querySelector('.battle-5v5').getBoundingClientRect();
+
+                const startX = fromRect.left - arenaRect.left + fromRect.width / 2;
+                const startY = fromRect.top - arenaRect.top + fromRect.height / 2;
+                const endX = toRect.left - arenaRect.left + toRect.width / 2;
+                const endY = toRect.top - arenaRect.top + toRect.height / 2;
+
+                proj.textContent = FIRE_EMOJIS[element] || '🔥';
+                proj.style.transition = 'none';
+                proj.style.left = `${startX - 16}px`;
+                proj.style.top = `${startY - 16}px`;
+                proj.style.opacity = '1';
+                proj.style.filter = `drop-shadow(0 0 8px ${ELEM_COLORS[element] || '#E74C3C'})`;
+
+                await this.delay(50);
+                proj.style.transition = 'all 0.4s ease-in';
+                proj.style.left = `${endX - 16}px`;
+                proj.style.top = `${endY - 16}px`;
+
+                await this.delay(400);
+                proj.style.opacity = '0';
+            },
+
+            addLog(text, isCrit) {
+                const log = document.getElementById('battle-log');
+                const entry = document.createElement('div');
+                entry.className = `log-entry${isCrit ? ' crit' : ''}`;
+                entry.textContent = text;
+                log.appendChild(entry);
+                log.scrollTop = log.scrollHeight;
+            },
+
+            delay(ms) { return new Promise(r => setTimeout(r, ms)); },
+
+            close() {
+                document.getElementById('battle-overlay').classList.remove('active');
+                WorldPage.init();
+            }
+        };
+
+        // Init on load
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await API.get('/auth/me');
+                WorldPage.init();
+            } catch (e) {
+                window.location.href = '/';
+            }
+        });
+    </script>
+</body>
+
+</html>
