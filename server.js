@@ -8,6 +8,9 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+// Railway runs behind a reverse proxy
+app.set('trust proxy', 1);
+
 // Process-level error handlers — prevent crashes
 process.on('uncaughtException', (err) => {
     console.error('[UNCAUGHT]', err.message);
