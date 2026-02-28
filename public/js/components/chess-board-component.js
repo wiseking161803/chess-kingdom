@@ -602,6 +602,8 @@ const ChessBoardComponent = {
         if (this.game.game_over()) return false;
         if (this.waitingForOpponent) return false;
         if (this.memoryPhase === 'memorize') return false;
+        // Memory mode: block dragging when pieces are hidden to prevent revealing piece identity
+        if (this.mode === 'memory' && this.memoryPhase === 'hidden') return false;
 
         const currentTurn = this.game.turn();
         const playerSide = this.playerColor === 'white' ? 'w' : 'b';
@@ -733,6 +735,8 @@ const ChessBoardComponent = {
         this.legalMoves = this.game.moves({ square: square, verbose: true }).map(m => m.to);
 
         this._highlightSquare(square, 'cbc-highlight-selected');
+        // Memory hidden mode: only highlight selected square, don't show legal moves (would reveal piece identity)
+        if (this.mode === 'memory' && this.memoryPhase === 'hidden') return;
         this.legalMoves.forEach(sq => this._highlightSquare(sq, 'cbc-highlight-move'));
     },
 
@@ -812,14 +816,12 @@ const ChessBoardComponent = {
     },
 
     _showOpponentArrow() {
-        // Show arrow for the OPPONENT's last move
+        // Show flash/glow on squares for the OPPONENT's last move
         this._clearAnnotations();
 
         if (this.lastOpponentMove) {
-            // Use stored move from playOpponentMove()
-            this._drawArrow(this.lastOpponentMove.from, this.lastOpponentMove.to, 'rgba(142, 68, 173, 0.85)');
+            this._flashMoveSquares(this.lastOpponentMove.from, this.lastOpponentMove.to);
         } else if (this.currentMoveIndex > 0) {
-            // Fallback: reconstruct from PGN data (e.g. second play mode)
             const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
             const prevNode = this.getMoveNode(puzzle, this.currentMoveIndex - 1);
             if (prevNode) {
@@ -828,11 +830,25 @@ const ChessBoardComponent = {
                     const tempGame = new Chess(prevFen);
                     try {
                         const result = tempGame.move(prevNode.move);
-                        if (result) this._drawArrow(result.from, result.to, 'rgba(142, 68, 173, 0.85)');
+                        if (result) this._flashMoveSquares(result.from, result.to);
                     } catch (e) { }
                 }
             }
         }
+    },
+
+    // Flash/glow effect on from and to squares (used in memory mode)
+    _flashMoveSquares(from, to) {
+        const boardEl = document.getElementById('cbc-board');
+        if (!boardEl) return;
+
+        [from, to].forEach(sq => {
+            const sqEl = boardEl.querySelector(`[data-square="${sq}"]`);
+            if (sqEl) {
+                sqEl.classList.add('cbc-flash-move');
+                setTimeout(() => sqEl.classList.remove('cbc-flash-move'), 2500);
+            }
+        });
     },
 
     _getFenAtMoveIndex(puzzle, targetIdx) {
@@ -1036,6 +1052,11 @@ const ChessBoardComponent = {
                 this.drawAnnotations(node);
             }
             this._showMoveComment(node);
+
+            // Flash player's move squares in memory mode
+            if (this.mode === 'memory' && this.memoryPhase === 'hidden') {
+                this._flashMoveSquares(source, target);
+            }
 
             this.currentMoveIndex++;
             this.board.position(this.game.fen());
@@ -1329,11 +1350,13 @@ const ChessBoardComponent = {
         if (solvedEl) solvedEl.textContent = `✅ ${this.sessionPuzzlesSolved}`;
 
         // Submit to backend
+        // Focus mode: if wrong moves were made, do NOT count as solved
+        const actualSolved = !(this.mode === 'focus' && this._madeWrongMove);
         try {
             const result = await API.post('/puzzles/solve', {
                 puzzle_set_id: this.pgnSource.puzzle_set.id,
                 puzzle_index: puzzle.puzzle_index,
-                solved: true,
+                solved: actualSolved,
                 attempts: this.attempts,
                 hints_used: this.hintsUsed,
                 time_seconds: timeSeconds,
