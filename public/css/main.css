@@ -1,4 +1,4 @@
-﻿/* ============================================
+/* ============================================
    CHESS KINGDOM â€” Design System
    Target: Children 6-12 years old
    Theme: Colorful, playful, animated
@@ -515,9 +515,10 @@ textarea {
 /* ---------- Village Map ---------- */
 .village-map {
     width: 100%;
-    height: calc(100vh - 44px);
+    height: calc(100vh - var(--header-h, 44px));
     overflow: auto;
-    background: #1a2a0a;
+    background:
+        radial-gradient(ellipse at center, #2a3a1a 0%, #1a2a0a 40%, #0f1a06 70%, #080e03 100%);
     user-select: none;
 }
 
@@ -525,9 +526,20 @@ textarea {
     position: relative;
     aspect-ratio: 2752 / 1536;
     width: 100%;
-    max-width: calc((100vh - 44px) * 2752 / 1536);
-    max-height: calc(100vh - 44px);
+    max-width: calc((100vh - var(--header-h, 44px)) * 2752 / 1536);
+    max-height: calc(100vh - var(--header-h, 44px));
     margin: auto;
+}
+
+/* Fog/vignette overlay on map edges for polish */
+.village-map-inner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: inset 0 0 60px 20px rgba(10, 18, 4, 0.5);
+    border-radius: inherit;
 }
 
 /* On very small / short screens, set min dimensions and allow scroll */
@@ -542,6 +554,25 @@ textarea {
     .village-map-inner {
         min-width: 580px;
         min-height: calc(580px * 1536 / 2752);
+    }
+}
+
+/* --- Portrait: fill viewport height, scroll horizontally --- */
+@media (max-aspect-ratio: 1/1) {
+    .village-map {
+        height: calc(100vh - var(--header-h, 44px));
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .village-map-inner {
+        /* Fill full viewport height, let width overflow */
+        height: calc(100vh - var(--header-h, 44px));
+        max-height: none;
+        width: auto;
+        max-width: none;
+        aspect-ratio: 2752 / 1536;
     }
 }
 
@@ -2169,7 +2200,7 @@ textarea {
 }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 768px) {
+@media (max-width: 768px) and (min-height: 600px) {
     .header-inner {
         flex-wrap: wrap;
     }
@@ -2603,18 +2634,40 @@ textarea {
     }
 }
 
-/* Memory mode: hide pieces on the board but NOT the floating dragged piece */
-.cbc-pieces-hidden .board-b72b1d img[data-piece] {
-    opacity: 0 !important;
-    visibility: hidden !important;
+/* Arrow layer must overlay the board for annotations and memory mode arrows */
+.cbc-board-area {
+    position: relative;
 }
 
-/* Dragged piece (floating/fixed position) should ALWAYS be visible */
-img.dragging,
-img[style*="position: fixed"],
-img[style*="position:fixed"] {
+#cbc-arrow-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 150;
+}
+
+/* Memory mode: hide pieces on the board but NOT the floating dragged piece */
+/* Uses #cbc-board ID + data-piece attribute — class names may vary by chessboardjs version */
+#cbc-board.cbc-pieces-hidden img[data-piece] {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: none !important;
+}
+
+/* Dragged piece (floating/absolute/fixed position) should ALWAYS be visible */
+/* chessboardjs appends dragged piece to body or uses inline styles */
+img.piece-417db[style*="position: absolute"][style*="z-index"],
+img[data-piece][style*="position: absolute"],
+img[data-piece][style*="position:absolute"],
+img[data-piece][style*="position: fixed"],
+img[data-piece][style*="position:fixed"],
+body>img[data-piece] {
     opacity: 1 !important;
     visibility: visible !important;
+    z-index: 11000 !important;
 }
 
 /* Smooth piece movement — improved easing */
@@ -2622,19 +2675,27 @@ img[style*="position:fixed"] {
     transition: none;
 }
 
-#cbc-board .board-b72b1d img[data-piece] {
+#cbc-board img[data-piece] {
     transition: top 0.2s cubic-bezier(0.25, 0.1, 0.25, 1),
         left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
     will-change: top, left;
 }
 
 /* Fix: chessboard.js dragged piece renders behind modal overlay */
-/* The library appends dragged piece to body with position:absolute but no z-index */
 .modal-content.has-chessboard {
     overflow: visible !important;
 }
 
 .modal-content.has-chessboard .modal-body {
+    overflow: visible !important;
+}
+
+/* Ensure ALL ancestor containers of the chessboard allow overflow for dragged pieces */
+.modal-overlay {
+    overflow: visible !important;
+}
+
+.modal-overlay .modal-content {
     overflow: visible !important;
 }
 
@@ -2645,7 +2706,8 @@ body>img[style*="position:absolute"] {
 }
 
 /* Chessboard.js board container inside modal needs high z-index too */
-.modal-overlay .board-b72b1d {
+.modal-overlay #cbc-board,
+.modal-overlay [id$="-cbc-container"] {
     z-index: 1001;
     position: relative;
 }
@@ -2730,13 +2792,8 @@ body>img[style*="position:absolute"] {
     transition: color 0.3s ease;
 }
 
-.cbc-variation-info {
-    background: #FFF8E1;
-    padding: 8px 12px;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    font-size: 0.85rem;
-}
+
+
 
 .cbc-stars {
     display: flex;
@@ -2782,7 +2839,89 @@ body>img[style*="position:absolute"] {
     flex-wrap: wrap;
 }
 
-/* Session summary modal */
+/* Board skin comment panel */
+.cbc-comment {
+    background: rgba(108, 92, 231, 0.08);
+    border-left: 3px solid var(--primary);
+    padding: 8px 12px;
+    border-radius: 0 8px 8px 0;
+    margin: 8px 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    animation: cbcFadeIn 0.3s ease;
+}
+
+@keyframes cbcFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Square highlight animation */
+.cbc-sq-highlight {
+    animation: cbcSqPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes cbcSqPulse {
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+}
+
+/* Skin selector modal */
+.cbc-skin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cbc-skin-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.cbc-skin-option:hover {
+    border-color: var(--primary-light);
+    background: rgba(108, 92, 231, 0.05);
+}
+
+.cbc-skin-option.active {
+    border-color: var(--primary);
+    background: rgba(108, 92, 231, 0.1);
+    box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.2);
+}
+
+/* Variation info dark theme */
+.cbc-variation-info {
+    background: rgba(108, 92, 231, 0.1);
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
 .cbc-summary {
     text-align: center;
     padding: var(--space-md);
@@ -2880,7 +3019,7 @@ body>img[style*="position:absolute"] {
 }
 
 /* ==========================================
-   MOUNTAIN PAGE — Núi Danh Vọng
+   SHARED ANIMATIONS & REWARD POPUP
    ========================================== */
 
 /* ELO Change Popup Animation */
@@ -2991,145 +3130,305 @@ body>img[style*="position:absolute"] {
     color: var(--text-muted);
 }
 
-.mountain-container {
-    max-width: 1100px;
+/* ==========================================
+   TOWER PAGE — Tháp Kỳ Vương (Tower Climbing)
+   ========================================== */
+
+.tower-climb-container {
+    max-width: 1200px;
     margin: 0 auto;
     padding: 24px 16px 60px;
 }
 
-/* --- Timeline --- */
-.mtn-timeline-wrap {
-    overflow-x: auto;
-    margin-bottom: 28px;
-    padding: 12px 0;
+.tower-climb-layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+    align-items: start;
 }
 
-.mtn-timeline {
-    display: flex;
-    align-items: flex-start;
-    gap: 0;
-    min-width: max-content;
-    padding: 0 8px;
+@media (max-width: 900px) {
+    .tower-climb-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
-.mtn-timeline-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 100px;
-    cursor: pointer;
-    transition: transform 0.2s;
-    position: relative;
-}
-
-.mtn-timeline-step:hover {
-    transform: translateY(-3px);
-}
-
-.mtn-step-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
+/* --- Tower Visual (Left Column) --- */
+.tower-visual {
     background: var(--bg-card);
-    border: 3px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.4rem;
-    transition: all 0.3s;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px 16px;
+    position: sticky;
+    top: 80px;
+}
+
+@media (max-width: 900px) {
+    .tower-visual {
+        position: static;
+    }
+}
+
+.tower-peak {
+    text-align: center;
+    padding: 16px 0 12px;
     position: relative;
-    z-index: 1;
 }
 
-.mtn-timeline-step.completed .mtn-step-icon {
-    border-color: var(--success);
-    background: #d1fae5;
+.tower-peak-icon {
+    font-size: 2.5rem;
+    animation: towerPeakGlow 3s ease-in-out infinite;
 }
 
-.mtn-timeline-step.current .mtn-step-icon {
-    border-color: var(--primary);
-    background: var(--primary-light);
-    box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.2), 0 0 20px rgba(108, 92, 231, 0.15);
-    animation: mtn-pulse 2s infinite;
+.tower-peak-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
 }
 
-@keyframes mtn-pulse {
+@keyframes towerPeakGlow {
 
     0%,
     100% {
-        box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.2);
+        filter: drop-shadow(0 0 8px rgba(255, 210, 0, 0.4));
+        transform: scale(1);
     }
 
     50% {
-        box-shadow: 0 0 0 8px rgba(108, 92, 231, 0.1), 0 0 20px rgba(108, 92, 231, 0.15);
+        filter: drop-shadow(0 0 20px rgba(255, 210, 0, 0.8));
+        transform: scale(1.05);
     }
 }
 
-.mtn-timeline-step.locked .mtn-step-icon {
-    opacity: 0.5;
-    filter: grayscale(0.5);
-}
-
-.mtn-step-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-top: 8px;
+.tower-base {
     text-align: center;
-    color: var(--text-secondary);
-    max-width: 90px;
-    line-height: 1.3;
+    padding: 12px 0 8px;
+    opacity: 0.6;
 }
 
-.mtn-timeline-step.current .mtn-step-label {
-    color: var(--primary);
-    font-weight: 700;
+.tower-base-icon {
+    font-size: 1.5rem;
 }
 
-.mtn-step-stars {
-    font-size: 0.65rem;
+.tower-base-label {
+    font-size: 0.7rem;
     color: var(--text-muted);
     margin-top: 2px;
 }
 
-.mtn-step-check {
-    position: absolute;
-    top: -4px;
-    right: 10px;
-    font-size: 0.8rem;
+/* --- Tower Floors --- */
+.tower-floors {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
-.mtn-step-progress {
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: var(--primary);
-    margin-top: 2px;
-    background: var(--primary-light);
-    padding: 1px 6px;
-    border-radius: 10px;
+.tower-floor-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-.mtn-timeline-line {
-    flex-shrink: 0;
-    width: 40px;
-    height: 3px;
+.tower-connector {
+    width: 4px;
+    height: 20px;
     background: var(--border);
-    margin-top: 24px;
     border-radius: 2px;
+    transition: background 0.3s;
 }
 
-.mtn-timeline-line.completed {
+.tower-connector.completed {
+    background: linear-gradient(180deg, var(--success), #34d399);
+}
+
+.tower-floor {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 2px solid var(--border);
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.tower-floor:hover:not(.locked) {
+    transform: translateX(4px);
+    border-color: var(--primary-light);
+    box-shadow: 0 4px 16px rgba(108, 92, 231, 0.12);
+}
+
+.tower-floor.completed {
+    border-color: var(--success);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(52, 211, 153, 0.04));
+}
+
+.tower-floor.current {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, rgba(108, 92, 231, 0.1), rgba(168, 85, 247, 0.05));
+    box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.15), 0 4px 20px rgba(108, 92, 231, 0.15);
+    animation: towerFloorPulse 2.5s infinite;
+}
+
+@keyframes towerFloorPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.15);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(108, 92, 231, 0.08), 0 4px 24px rgba(108, 92, 231, 0.2);
+    }
+}
+
+.tower-floor.locked {
+    opacity: 0.5;
+    filter: grayscale(0.5);
+    cursor: not-allowed;
+}
+
+.tower-floor.locked:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.tower-floor-number {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    background: var(--bg-main);
+    padding: 2px 8px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    min-width: 30px;
+    text-align: center;
+}
+
+.tower-floor.current .tower-floor-number {
+    background: var(--primary);
+    color: white;
+}
+
+.tower-floor.completed .tower-floor-number {
     background: var(--success);
+    color: white;
 }
 
-/* --- Detail Header --- */
-.mtn-detail-header {
+.tower-floor-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.tower-floor-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.tower-floor-name {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tower-floor-stars {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+
+.tower-floor-progress-text {
+    font-size: 0.65rem;
+    color: var(--primary);
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.tower-floor-status {
+    flex-shrink: 0;
+}
+
+.tower-floor-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.tower-floor-badge--done {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.tower-floor-badge--current {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.tower-floor-badge--locked {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.tower-floor-progressbar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(108, 92, 231, 0.1);
+}
+
+.tower-floor-progressbar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #a78bfa);
+    border-radius: 0 0 14px 14px;
+    transition: width 0.6s ease;
+}
+
+/* --- Tower Detail Panel (Right Column) --- */
+.tower-detail-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+    min-height: 400px;
+}
+
+.tower-detail-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    color: var(--text-muted);
+    gap: 12px;
+}
+
+.tower-detail-empty-icon {
+    font-size: 4rem;
+    opacity: 0.4;
+}
+
+.tower-detail-header {
     display: flex;
     align-items: center;
     gap: 16px;
     margin-bottom: 20px;
 }
 
-.mtn-detail-icon {
+.tower-detail-icon {
     font-size: 2.5rem;
     width: 64px;
     height: 64px;
@@ -3141,29 +3440,29 @@ body>img[style*="position:absolute"] {
     flex-shrink: 0;
 }
 
-.mtn-detail-title {
+.tower-detail-title {
     font-size: 1.4rem;
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
 }
 
-.mtn-detail-desc {
+.tower-detail-desc {
     font-size: 0.85rem;
     color: var(--text-secondary);
     margin-top: 4px;
 }
 
-/* --- Overall Progress --- */
-.mtn-overall-progress {
-    background: var(--bg-card);
+/* --- Tower Detail Progress --- */
+.tower-detail-progress {
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px;
     margin-bottom: 24px;
 }
 
-.mtn-overall-text {
+.tower-detail-progress-text {
     display: flex;
     justify-content: space-between;
     font-size: 0.85rem;
@@ -3171,35 +3470,35 @@ body>img[style*="position:absolute"] {
     margin-bottom: 10px;
 }
 
-.mtn-overall-bar {
+.tower-detail-progress-bar {
     height: 10px;
     background: var(--bg-main);
     border-radius: 5px;
     overflow: hidden;
 }
 
-.mtn-overall-fill {
+.tower-detail-progress-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--primary), #a78bfa);
     border-radius: 5px;
     transition: width 0.6s ease;
 }
 
-/* --- Task Group Cards --- */
-.mtn-groups-grid {
+/* --- Tower Task Groups --- */
+.tower-detail-groups {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
 }
 
 @media (max-width: 768px) {
-    .mtn-groups-grid {
+    .tower-detail-groups {
         grid-template-columns: 1fr;
     }
 }
 
-.mtn-group-card {
-    background: var(--bg-card);
+.tower-group-card {
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 16px;
     overflow: hidden;
@@ -3207,18 +3506,18 @@ body>img[style*="position:absolute"] {
     border-top: 3px solid var(--group-color, var(--primary));
 }
 
-.mtn-group-card:hover {
+.tower-group-card:hover {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
-.mtn-group-header {
+.tower-group-header {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 16px;
 }
 
-.mtn-group-icon {
+.tower-group-icon {
     font-size: 1.6rem;
     width: 44px;
     height: 44px;
@@ -3230,44 +3529,44 @@ body>img[style*="position:absolute"] {
     flex-shrink: 0;
 }
 
-.mtn-group-info {
+.tower-group-info {
     flex: 1;
 }
 
-.mtn-group-name {
+.tower-group-name {
     font-weight: 700;
     font-size: 0.95rem;
     color: var(--text-primary);
 }
 
-.mtn-group-stat {
+.tower-group-stat {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 2px;
 }
 
-.mtn-group-pct {
+.tower-group-pct {
     font-size: 1.2rem;
     font-weight: 800;
 }
 
-.mtn-group-bar {
+.tower-group-bar {
     height: 4px;
     background: var(--bg-main);
     margin: 0 16px;
 }
 
-.mtn-group-bar-fill {
+.tower-group-bar-fill {
     height: 100%;
     border-radius: 2px;
     transition: width 0.6s ease;
 }
 
-.mtn-group-tasks {
+.tower-group-tasks {
     padding: 8px 16px 16px;
 }
 
-.mtn-task-item {
+.tower-task-item {
     display: flex;
     align-items: flex-start;
     gap: 10px;
@@ -3275,49 +3574,49 @@ body>img[style*="position:absolute"] {
     border-bottom: 1px solid var(--border);
 }
 
-.mtn-task-item:last-child {
+.tower-task-item:last-child {
     border-bottom: none;
 }
 
-.mtn-task-check {
+.tower-task-check {
     font-size: 1rem;
     margin-top: 2px;
     flex-shrink: 0;
 }
 
-.mtn-task-content {
+.tower-task-content {
     flex: 1;
     min-width: 0;
 }
 
-.mtn-task-title {
+.tower-task-title {
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-primary);
 }
 
-.mtn-task-item.completed .mtn-task-title {
+.tower-task-item.completed .tower-task-title {
     text-decoration: line-through;
     opacity: 0.6;
 }
 
-.mtn-task-desc {
+.tower-task-desc {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 2px;
 }
 
-.mtn-task-reward {
+.tower-task-reward {
     font-size: 0.7rem;
     color: var(--text-secondary);
     margin-top: 3px;
 }
 
-.mtn-task-action {
+.tower-task-action {
     flex-shrink: 0;
 }
 
-.mtn-task-done-badge {
+.tower-task-done-badge {
     font-size: 0.7rem;
     background: #d1fae5;
     color: #059669;
@@ -3327,11 +3626,16 @@ body>img[style*="position:absolute"] {
     white-space: nowrap;
 }
 
-.mtn-empty-tasks {
+.tower-empty-tasks {
     text-align: center;
     color: var(--text-muted);
     font-size: 0.8rem;
     padding: 16px;
+}
+
+/* Keep old .mtn-* classes for backward compatibility if needed */
+.mountain-container {
+    display: none;
 }
 
 /* ==========================================
@@ -3741,9 +4045,9 @@ body>img[style*="position:absolute"] {
 /* ============================================
    RESPONSIVE — TABLET (≤768px)
    ============================================ */
-@media (max-width: 768px) {
+@media (max-width: 768px) and (min-height: 600px) {
 
-    /* Header */
+    /* Header — only wrap on tall viewports (portrait tablets) */
     .header-inner {
         flex-wrap: wrap;
         gap: 8px;
@@ -4001,6 +4305,23 @@ body>img[style*="position:absolute"] {
 .building-label--blue {
     background: rgba(20, 60, 120, 0.88);
     border-color: rgba(52, 152, 219, 0.4);
+}
+
+/* Portal landmark floating animation */
+@keyframes portalFloat {
+
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+    }
+
+    50% {
+        transform: translateY(-6px) scale(1.03);
+    }
+}
+
+.building-landmark {
+    pointer-events: none;
 }
 
 /* --- Gacha Container --- */
@@ -4503,24 +4824,24 @@ body>img[style*="position:absolute"] {
 @keyframes birdFly {
     0% {
         left: -5%;
-        transform: translateY(0);
+        transform: scaleX(-1) translateY(0);
     }
 
     25% {
-        transform: translateY(-15px);
+        transform: scaleX(-1) translateY(-15px);
     }
 
     50% {
-        transform: translateY(5px);
+        transform: scaleX(-1) translateY(5px);
     }
 
     75% {
-        transform: translateY(-8px);
+        transform: scaleX(-1) translateY(-8px);
     }
 
     100% {
         left: 105%;
-        transform: translateY(0);
+        transform: scaleX(-1) translateY(0);
     }
 }
 
@@ -4852,4 +5173,379 @@ body>img[style*="position:absolute"] {
 .header-btn-badge {
     background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 165, 0, 0.2));
     border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+
+
+/* ============================================
+   RESPONSIVE - MEDIUM (1100px or less)
+   Tablets and small laptops
+   ============================================ */
+@media (max-width: 1100px) {
+    .header-logo {
+        font-size: 1.1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        flex-shrink: 1;
+    }
+
+    .header-logo .logo-icon {
+        font-size: 1.1em;
+    }
+
+    .stat-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+    }
+
+    .header-btn {
+        padding: 4px 8px;
+        font-size: 0.8rem;
+    }
+
+    .user-info {
+        max-width: 100px;
+    }
+
+    .user-avatar {
+        width: 30px;
+        height: 30px;
+    }
+}
+
+/* ============================================
+   RESPONSIVE — COMPACT HEADER (landscape small)
+   For landscape phones/tablets where height is limited
+   ============================================ */
+@media (orientation: landscape) and (max-height: 600px) {
+    :root {
+        --header-h: 36px;
+    }
+
+    .app-header {
+        padding: 2px var(--space-sm);
+        min-height: 36px;
+    }
+
+    .header-inner {
+        flex-wrap: nowrap;
+        gap: var(--space-sm);
+    }
+
+    .header-logo {
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .header-logo .logo-icon {
+        font-size: 1em;
+    }
+
+    .header-stats {
+        order: unset;
+        width: auto;
+        gap: 4px;
+        flex-shrink: 1;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .header-stats::-webkit-scrollbar {
+        display: none;
+    }
+
+    .stat-badge {
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        gap: 2px;
+    }
+
+    .stat-badge .stat-icon {
+        font-size: 0.85em;
+    }
+
+    .header-user {
+        gap: 4px;
+    }
+
+    .user-info {
+        display: none;
+    }
+
+    .user-avatar {
+        width: 26px;
+        height: 26px;
+        font-size: 0.8rem;
+    }
+
+    .header-actions {
+        gap: 3px;
+    }
+
+    .header-btn {
+        padding: 2px 5px;
+        font-size: 0.65rem;
+        min-width: 28px;
+    }
+
+    .village-map {
+        height: calc(100vh - 36px);
+    }
+}
+
+/* ============================================
+   RESPONSIVE — COMPACT HEADER (portrait small)
+   Single-row header for portrait phones
+   ============================================ */
+@media (max-width: 480px) {
+    :root {
+        --header-h: 36px;
+    }
+
+    .app-header {
+        padding: 2px var(--space-sm);
+        min-height: 36px;
+    }
+
+    .header-inner {
+        flex-wrap: nowrap;
+        gap: 6px;
+    }
+
+    .header-logo {
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .header-logo .logo-icon {
+        font-size: 1em;
+    }
+
+    /* Hide stat badges on narrow portrait — too cramped */
+    .header-stats {
+        display: none;
+    }
+
+    .header-user {
+        display: none;
+    }
+
+    .header-actions {
+        gap: 3px;
+        flex-shrink: 0;
+    }
+
+    .header-btn {
+        padding: 3px 6px;
+        font-size: 0.75rem;
+        min-width: 28px;
+    }
+}
+
+/* ============================================
+   SIDEBAR DRAWER — Mobile Menu
+   ============================================ */
+
+/* Hamburger toggle — hidden by default */
+.sidebar-toggle {
+    display: none;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 1.1rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Only show hamburger on narrow screens */
+@media (max-width: 480px) {
+    .sidebar-toggle {
+        display: flex;
+    }
+}
+
+/* Overlay backdrop */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.sidebar-open {
+    display: block;
+    opacity: 1;
+}
+
+/* Drawer panel */
+.sidebar-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    background: linear-gradient(180deg, #2d1b69 0%, #1a1145 50%, #0f0b2e 100%);
+    z-index: 201;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+}
+
+.sidebar-drawer.sidebar-open {
+    transform: translateX(0);
+}
+
+/* Sidebar header — user profile */
+.sidebar-header {
+    padding: 24px 20px 20px;
+    background: linear-gradient(135deg, rgba(108, 92, 231, 0.3), rgba(162, 155, 254, 0.15));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    text-align: center;
+}
+
+.sidebar-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    margin: 0 auto 10px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.sidebar-avatar:hover {
+    transform: scale(1.1);
+}
+
+.sidebar-user-name {
+    color: white;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.sidebar-user-rank {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    margin-top: 2px;
+}
+
+.sidebar-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.sidebar-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* Sidebar stats grid */
+.sidebar-stats {
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.sidebar-stat {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 10px;
+    text-align: center;
+}
+
+.sidebar-stat-icon {
+    display: block;
+    font-size: 1.3rem;
+    margin-bottom: 4px;
+}
+
+.sidebar-stat-label {
+    display: block;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-stat-value {
+    display: block;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-top: 2px;
+}
+
+/* Sidebar action buttons */
+.sidebar-actions {
+    padding: 12px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.sidebar-action-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-action-btn--danger {
+    color: #ff7675;
+    margin-top: auto;
 }

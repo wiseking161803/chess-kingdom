@@ -259,4 +259,83 @@ router.get('/award-history', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/users/:id/stats — User puzzle statistics
+ */
+router.get('/users/:id/stats', async (req, res) => {
+    try {
+        const userId = req.params.id;
+
+        // Basic user info
+        const [users] = await db.query(`
+            SELECT u.display_name, u.username, u.current_rank,
+                   uc.knowledge_stars, uc.chess_coins,
+                   ue.current_elo,
+                   us.current_streak, us.longest_streak
+            FROM users u
+            LEFT JOIN user_currencies uc ON u.id = uc.user_id
+            LEFT JOIN user_elo ue ON u.id = ue.user_id
+            LEFT JOIN user_streaks us ON u.id = us.user_id
+            WHERE u.id = ?
+        `, [userId]);
+
+        if (users.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
+
+        // Aggregate session stats
+        let sessionStats = { total_sessions: 0, total_time: 0, total_solved: 0, total_failed: 0 };
+        try {
+            const [ss] = await db.query(`
+                SELECT COUNT(*) as total_sessions,
+                       COALESCE(SUM(total_time_seconds), 0) as total_time,
+                       COALESCE(SUM(puzzles_solved), 0) as total_solved,
+                       COALESCE(SUM(puzzles_failed), 0) as total_failed
+                FROM puzzle_sessions WHERE user_id = ?
+            `, [userId]);
+            if (ss[0]) sessionStats = ss[0];
+        } catch (e) { /* puzzle_sessions may not exist */ }
+
+        // Per-set progress
+        let setProgress = [];
+        try {
+            const [sp] = await db.query(`
+                SELECT ps.id, ps.name, ps.puzzle_count, ps.solve_mode,
+                       COUNT(pp.id) as solved_count,
+                       COALESCE(SUM(pp.time_seconds), 0) as set_time
+                FROM puzzle_sets ps
+                LEFT JOIN puzzle_progress pp ON ps.id = pp.puzzle_set_id AND pp.user_id = ? AND pp.solved = 1
+                WHERE ps.is_active = 1
+                GROUP BY ps.id
+                ORDER BY solved_count DESC
+            `, [userId]);
+            setProgress = sp;
+        } catch (e) { /* ignore */ }
+
+        // Recent sessions
+        let recentSessions = [];
+        try {
+            const [rs] = await db.query(`
+                SELECT ps2.mode, ps2.puzzles_solved, ps2.puzzles_failed,
+                       ps2.total_time_seconds, ps2.accuracy, ps2.elo_change, ps2.created_at,
+                       pset.name as set_name
+                FROM puzzle_sessions ps2
+                LEFT JOIN puzzle_sets pset ON ps2.puzzle_set_id = pset.id
+                WHERE ps2.user_id = ?
+                ORDER BY ps2.created_at DESC
+                LIMIT 10
+            `, [userId]);
+            recentSessions = rs;
+        } catch (e) { /* ignore */ }
+
+        res.json({
+            user: users[0],
+            sessionStats,
+            setProgress,
+            recentSessions
+        });
+    } catch (err) {
+        console.error('User stats error:', err);
+        res.status(500).json({ error: 'Lỗi lấy thống kê' });
+    }
+});
+
 module.exports = router;

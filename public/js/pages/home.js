@@ -27,10 +27,10 @@ const HomePage = {
         B_hall: { x: 48, y: 30 },   // Golden temple
         B_market: { x: 76, y: 47 },   // Market stalls
         B_tree: { x: 88, y: 72 },   // Magic tree
-        B_mountain: { x: 88, y: 14 },   // Purple mountain
+        B_mountain: { x: 88, y: 19 },   // Purple mountain
         B_dragon: { x: 6, y: 55 },   // Dragon cave
         B_pond: { x: 42, y: 65 },   // Wishing pond
-        B_world: { x: 50, y: 12 },   // World map
+        B_world: { x: 50, y: 17 },   // World map
         B_garden: { x: 48, y: 85 },  // Garden farm
     },
 
@@ -104,6 +104,7 @@ const HomePage = {
         return `
         <div class="app-header">
             <div class="header-inner">
+                <button class="sidebar-toggle" onclick="HomePage.toggleSidebar()" aria-label="Menu">☰</button>
                 <div class="header-logo">
                     <span class="logo-icon">♟️</span>
                     Vương Quốc Cờ Vua
@@ -142,13 +143,37 @@ const HomePage = {
             </div>
         </div>
 
+        <!-- Mobile Sidebar -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="HomePage.toggleSidebar()"></div>
+        <div class="sidebar-drawer" id="sidebar-drawer">
+            <div class="sidebar-header">
+                <div class="sidebar-avatar" onclick="AvatarSelector.showSelector(); HomePage.toggleSidebar();">${AvatarSelector.getCurrentAvatar()}</div>
+                <div class="sidebar-user-name">${user.display_name || 'Hiệp Sĩ'}</div>
+                <div class="sidebar-user-rank">${user.current_rank || 'Tân Binh Trí Tuệ'}</div>
+                <button class="sidebar-close" onclick="HomePage.toggleSidebar()">✕</button>
+            </div>
+            <div class="sidebar-stats">
+                <div class="sidebar-stat"><span class="sidebar-stat-icon">⭐</span><span class="sidebar-stat-label">Sao Tri Thức</span><span class="sidebar-stat-value" id="sidebar-stars">${stats.knowledge_stars || 0}</span></div>
+                <div class="sidebar-stat"><span class="sidebar-stat-icon">🪙</span><span class="sidebar-stat-label">Xu Cờ</span><span class="sidebar-stat-value" id="sidebar-coins">${stats.chess_coins || 0}</span></div>
+                <div class="sidebar-stat"><span class="sidebar-stat-icon">📊</span><span class="sidebar-stat-label">ELO Rating</span><span class="sidebar-stat-value" id="sidebar-elo">${stats.elo || 800}</span></div>
+                <div class="sidebar-stat"><span class="sidebar-stat-icon">🔥</span><span class="sidebar-stat-label">Chuỗi ngày</span><span class="sidebar-stat-value" id="sidebar-streak">${stats.current_streak || 0}</span></div>
+            </div>
+            <div class="sidebar-actions">
+                <button class="sidebar-action-btn" onclick="BadgeShowcase.show(); HomePage.toggleSidebar();">🏅 Thành tích</button>
+                <button class="sidebar-action-btn" onclick="StatsPage.open(); HomePage.toggleSidebar();">📊 Thống kê</button>
+                <button class="sidebar-action-btn" onclick="HomePage.openInventory(); HomePage.toggleSidebar();">🎒 Kho đồ</button>
+                ${user.role === 'admin' ? '<button class="sidebar-action-btn" onclick="App.navigate(\'admin\'); HomePage.toggleSidebar();">⚙️ Admin</button>' : ''}
+                <button class="sidebar-action-btn sidebar-action-btn--danger" onclick="App.logout();">🚪 Đăng xuất</button>
+            </div>
+        </div>
+
         <div class="village-map" id="village-map">
           <div class="village-map-inner">
             <img class="village-bg" src="/img/map/village-bg.jpg" alt="Village map" draggable="false" />
 
             <!-- Tháp Kỳ Vương — Blue Tower (upper-left) -->
             <div class="building" data-id="puzzle" data-sound="chime" style="left:28%;top:18%;--glow-color:#6C9EFF;"
-                 onclick="HomePage.goToBuilding('B_puzzle', function(){ TowerPage.open(); })">
+                 onclick="HomePage.goToBuilding('B_puzzle', function(){ App.navigate('tower'); })">
                 <div class="building-particles particles--sparkles"><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></div>
                 <div class="building-label">
                     <span class="label-icon">🏰</span>
@@ -199,8 +224,8 @@ const HomePage = {
             </div>
 
             <!-- Núi Danh Vọng — Mountain (top-right) -->
-            <div class="building" data-id="mountain" data-sound="whistle" style="left:88%;top:14%;--glow-color:#B088FF;"
-                 onclick="HomePage.goToBuilding('B_mountain', function(){ App.navigate('mountain'); })">
+            <div class="building" data-id="mountain" data-sound="whistle" style="left:88%;top:19%;--glow-color:#B088FF;"
+                 onclick="HomePage.goToBuilding('B_mountain', function(){ MountainPage.open(); })">
                 <div class="building-particles particles--snow"><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></div>
                 <div class="building-label building-label--purple">
                     <span class="label-icon">⛰️</span>
@@ -242,8 +267,9 @@ const HomePage = {
             </div>
 
             <!-- Ra Thế Giới — World Map (center-top field) -->
-            <div class="building" data-id="world" data-sound="wind" style="left:50%;top:12%;--glow-color:#3498DB;"
+            <div class="building" data-id="world" data-sound="wind" style="left:50%;top:17%;--glow-color:#3498DB;"
                  onclick="window.location.href='/world'">
+                <img src="/img/map/world_portal.png" class="building-landmark" alt="Portal" style="width:90px;height:90px;object-fit:contain;margin:-20px auto 0;display:block;filter:drop-shadow(0 0 12px rgba(52,152,219,0.5));animation:portalFloat 3s ease-in-out infinite;">
                 <div class="building-particles particles--sparkles"><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></div>
                 <div class="building-label building-label--blue">
                     <span class="label-icon">🌍</span>
@@ -287,6 +313,54 @@ const HomePage = {
 
         // F1: Start background music (user gesture required)
         document.addEventListener('click', () => BGMusic.start(), { once: true });
+
+        // Load active buffs overlay
+        this.loadBuffOverlay();
+    },
+
+    toggleSidebar() {
+        const sidebar = document.getElementById('sidebar-drawer');
+        const overlay = document.getElementById('sidebar-overlay');
+        if (sidebar && overlay) {
+            sidebar.classList.toggle('sidebar-open');
+            overlay.classList.toggle('sidebar-open');
+        }
+    },
+
+    async loadBuffOverlay() {
+        try {
+            const data = await API.get('/dragon/inventory');
+            const buffs = data.active_buffs || [];
+            let container = document.getElementById('buff-overlay');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'buff-overlay';
+                container.style.cssText = 'position:fixed;top:60px;right:10px;z-index:900;display:flex;flex-direction:column;gap:4px;pointer-events:none;';
+                document.body.appendChild(container);
+            }
+            if (buffs.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = buffs.map(b => {
+                const exp = new Date(b.expires_at);
+                const remain = Math.max(0, Math.ceil((exp - Date.now()) / 60000));
+                const hrs = Math.floor(remain / 60);
+                const mins = remain % 60;
+                const label = b.buff_type === 'att_boost_100' ? '⚔️ ATT+100%'
+                    : b.buff_type === 'def_boost_50' ? '🛡️ DEF+50%'
+                        : b.buff_type;
+                const color = b.buff_type.includes('att') ? '#e74c3c' : '#2ecc71';
+                return `<div style="pointer-events:auto;background:rgba(0,0,0,0.75);border:1.5px solid ${color};border-radius:8px;padding:4px 10px;font-size:0.72rem;color:#fff;backdrop-filter:blur(6px);display:flex;align-items:center;gap:6px;animation:fadeIn 0.3s">
+                    <span style="font-weight:700;color:${color}">${label}</span>
+                    <span style="opacity:0.7;font-size:0.65rem">${hrs}h${mins}m</span>
+                </div>`;
+            }).join('');
+
+            // Auto-refresh every 60s
+            if (this._buffTimer) clearTimeout(this._buffTimer);
+            this._buffTimer = setTimeout(() => this.loadBuffOverlay(), 60000);
+        } catch (e) { /* silently skip */ }
     },
 
     goToBuilding(targetWP, callback, isLocked) {
@@ -346,52 +420,116 @@ const HomePage = {
             if (el('header-coins')) el('header-coins').textContent = s.chess_coins;
             if (el('header-elo')) el('header-elo').textContent = s.elo;
             if (el('header-streak')) el('header-streak').textContent = s.current_streak;
+            // Also update sidebar stats
+            if (el('sidebar-stars')) el('sidebar-stars').textContent = s.knowledge_stars;
+            if (el('sidebar-coins')) el('sidebar-coins').textContent = s.chess_coins;
+            if (el('sidebar-elo')) el('sidebar-elo').textContent = s.elo;
+            if (el('sidebar-streak')) el('sidebar-streak').textContent = s.current_streak;
         } catch (err) { }
     },
 
     async openInventory() {
         try {
-            const data = await API.get('/dragon/inventory');
-            const items = data.items || [];
-            const buffs = data.active_buffs || [];
+            const data = await API.get('/shop/inventory');
 
+            // Active buffs
             let buffHtml = '';
-            if (buffs.length > 0) {
-                buffHtml = '<div style="margin-bottom:12px;padding:8px;background:rgba(46,204,113,0.15);border:1px solid rgba(46,204,113,0.3);border-radius:8px;font-size:0.8rem;">' +
-                    '<div style="font-weight:600;margin-bottom:4px;">🛡️ Buff đang hoạt động:</div>' +
-                    buffs.map(b => {
-                        const exp = new Date(b.expires_at);
-                        const remain = Math.max(0, Math.ceil((exp - Date.now()) / 3600000));
-                        const label = b.buff_type === 'att_boost_100' ? '⚔️ +100% ATT' : b.buff_type === 'def_boost_50' ? '🛡️ +50% DEF' : b.buff_type;
-                        return `<div>${label} — còn ${remain}h</div>`;
-                    }).join('') +
-                    '</div>';
-            }
+            try {
+                const dragonData = await API.get('/dragon/inventory');
+                const buffs = dragonData.active_buffs || [];
+                if (buffs.length > 0) {
+                    buffHtml = '<div style="margin-bottom:12px;padding:8px;background:rgba(46,204,113,0.15);border:1px solid rgba(46,204,113,0.3);border-radius:8px;font-size:0.8rem;">' +
+                        '<div style="font-weight:600;margin-bottom:4px;">🛡️ Buff đang hoạt động:</div>' +
+                        buffs.map(b => {
+                            const exp = new Date(b.expires_at);
+                            const remain = Math.max(0, Math.ceil((exp - Date.now()) / 3600000));
+                            const label = b.buff_type === 'att_boost_100' ? '⚔️ +100% ATT' : b.buff_type === 'def_boost_50' ? '🛡️ +50% DEF' : b.buff_type;
+                            return `<div>${label} — còn ${remain}h</div>`;
+                        }).join('') + '</div>';
+                }
+            } catch (e) { }
 
-            let itemsHtml = '';
-            if (items.length === 0) {
-                itemsHtml = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.4);">📦 Kho đồ trống. Hãy mua vật phẩm ở Chợ Phiên!</div>';
+            let html = buffHtml;
+            const totalItems = (data.inventory?.length || 0) + (data.eggs?.length || 0) + (data.equipment?.length || 0);
+
+            if (totalItems === 0) {
+                html += '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.4);">📦 Kho đồ trống. Hãy mua vật phẩm ở Chợ Phiên!</div>';
             } else {
-                itemsHtml = items.map(it => {
-                    const icon = it.icon_url || (it.category === 'dragon_potion' ? '🧪' : it.category === 'dragon_buff' ? '🛡️' : '🍖');
-                    return `
-                        <div style="display:flex;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:6px;">
-                            <div style="font-size:1.5rem;width:40px;text-align:center;">${icon}</div>
-                            <div style="flex:1;">
-                                <div style="font-weight:600;font-size:0.85rem;">${it.name}</div>
-                                <div style="font-size:0.75rem;color:rgba(255,255,255,0.5);">${it.description || ''} · ×${it.quantity}</div>
-                            </div>
-                            <button class="btn btn-primary btn-sm" onclick="HomePage.useItem(${it.item_id})">Sử Dụng</button>
+                // === DRAGON EGGS (collapsible) ===
+                if (data.eggs && data.eggs.length > 0) {
+                    html += `<div style="margin-bottom:10px">
+                        <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.inv-arrow').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'" style="font-size:0.85rem;font-weight:700;color:#f39c12;cursor:pointer;padding:6px 0;display:flex;align-items:center;gap:6px;user-select:none">
+                            <span class="inv-arrow">▼</span> 🥚 Trứng Rồng (${data.eggs.length})
                         </div>
-                    `;
-                }).join('');
+                        <div>`;
+                    for (const egg of data.eggs) {
+                        const ready = egg.ready;
+                        const mins = Math.floor(egg.time_left / 60);
+                        const hrs = Math.floor(mins / 60);
+                        const timeStr = ready ? '✅ Sẵn sàng nở!' : `⏳ Còn ${hrs}h ${mins % 60}m`;
+                        html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(243,156,18,0.08);border:1.5px solid rgba(243,156,18,0.25);margin-bottom:5px">
+                            <div style="font-size:1.5rem">🥚</div>
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:700;font-size:0.8rem">${egg.name || 'Trứng Rồng'}</div>
+                                <div style="font-size:0.7rem;color:${ready ? '#2ecc71' : '#f39c12'}">${timeStr}</div>
+                            </div>
+                            ${ready ? `<button class="btn btn-primary btn-sm" onclick="Modal.hide('inventory-modal');DragonPage.open();setTimeout(()=>DragonPage.switchTab&&DragonPage.switchTab('eggs'),500)" style="font-size:0.7rem;padding:4px 8px;white-space:nowrap">🐣 Nở</button>` : ''}
+                        </div>`;
+                    }
+                    html += '</div></div>';
+                }
+
+                // === EQUIPMENT (collapsible) ===
+                if (data.equipment && data.equipment.length > 0) {
+                    const rc_ = { common: '#9E9E9E', rare: '#2196F3', epic: '#9C27B0', legendary: '#FF9800', mythic: '#FF1493' };
+                    const rn_ = { common: 'Thường', rare: 'Hiếm', epic: 'Sử Thi', legendary: 'Huyền Thoại', mythic: 'Thần Thoại' };
+                    html += `<div style="margin-bottom:10px">
+                        <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.inv-arrow').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'" style="font-size:0.85rem;font-weight:700;color:#9b59b6;cursor:pointer;padding:6px 0;display:flex;align-items:center;gap:6px;user-select:none">
+                            <span class="inv-arrow">▼</span> ⚔️ Trang Bị Chưa Đeo (${data.equipment.length})
+                        </div>
+                        <div>`;
+                    for (const eq of data.equipment) {
+                        const rc = rc_[eq.rarity] || '#666';
+                        html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(155,89,182,0.06);border:1.5px solid ${rc}40;margin-bottom:5px">
+                            <div style="font-size:1.4rem">${eq.icon || '⚔️'}</div>
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:700;font-size:0.8rem;color:${rc}">${eq.name}</div>
+                                <div style="font-size:0.65rem;opacity:0.6">${rn_[eq.rarity] || eq.rarity} · ${eq.slot || ''}</div>
+                            </div>
+                            <button class="btn btn-sm" onclick="Modal.hide('inventory-modal');DragonPage.open()" style="font-size:0.68rem;padding:3px 7px;background:${rc}20;border:1px solid ${rc}50;color:${rc}">Trang bị</button>
+                        </div>`;
+                    }
+                    html += '</div></div>';
+                }
+
+                // === CONSUMABLE ITEMS (collapsible) ===
+                if (data.inventory && data.inventory.length > 0) {
+                    html += `<div style="margin-bottom:10px">
+                        <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.inv-arrow').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'" style="font-size:0.85rem;font-weight:700;color:#3498db;cursor:pointer;padding:6px 0;display:flex;align-items:center;gap:6px;user-select:none">
+                            <span class="inv-arrow">▼</span> 🎒 Vật Phẩm (${data.inventory.length})
+                        </div>
+                        <div>`;
+                    for (const item of data.inventory) {
+                        const usable = ['dragon_food', 'dragon_potion', 'dragon_buff'].includes(item.category);
+                        html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(52,152,219,0.06);border:1.5px solid rgba(52,152,219,0.2);margin-bottom:5px">
+                            <div style="font-size:1.4rem">${item.icon_url || '🎁'}</div>
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:700;font-size:0.8rem">${item.name}</div>
+                                <div style="font-size:0.65rem;opacity:0.5">${item.description || ''}</div>
+                            </div>
+                            <div style="font-size:0.75rem;font-weight:700;color:#3498db;margin-right:4px">x${item.quantity}</div>
+                            ${usable ? `<button class="btn btn-primary btn-sm" onclick="Modal.hide('inventory-modal');DragonPage.open()" style="font-size:0.68rem;padding:3px 7px">Dùng</button>` : ''}
+                        </div>`;
+                    }
+                    html += '</div></div>';
+                }
             }
 
             Modal.create({
                 id: 'inventory-modal',
                 title: '🎒 Kho Đồ',
                 icon: '🎒',
-                content: `<div style="max-height:400px;overflow-y:auto;">${buffHtml}${itemsHtml}</div>`
+                content: `<div style="max-height:400px;overflow-y:auto;">${html}</div>`
             });
             Modal.show('inventory-modal');
         } catch (err) {

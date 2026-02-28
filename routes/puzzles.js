@@ -21,75 +21,193 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
+// ═══════════════════════════════════════════════════════════════════
+// PGN PARSER — Full variation tree support with comments, NAGs,
+// arrows ([%cal]), highlights ([%csl]), and recursive variations
+// ═══════════════════════════════════════════════════════════════════
+
 /**
- * Parse PGN move text into a move tree with variations.
- * Returns array of move nodes: { move: "e4", alternatives: ["d4", "c4"] }
- *
- * For player moves: alternatives = other valid moves (any is correct)
- * For opponent moves: alternatives = other possible responses (info only)
+ * NAG symbol mapping: annotation symbols → NAG numbers
  */
-function parseMoveTree(movesText, fen) {
-    // Clean annotations but KEEP variations in parentheses
-    let cleaned = movesText
-        .replace(/\{[^}]*\}/g, '')           // Remove comments {text}
-        .replace(/\$\d+/g, '')               // Remove NAG annotations ($1, $2)
-        .replace(/1-0|0-1|1\/2-1\/2|\*/g, '') // Remove results
-        .trim();
+const ANNOTATION_TO_NAG = { '!': 1, '?': 2, '!!': 3, '??': 4, '!?': 5, '?!': 6 };
+const NAG_TO_SYMBOL = { 1: '!', 2: '?', 3: '!!', 4: '??', 5: '!?', 6: '?!' };
 
-    if (!cleaned) return [];
+/**
+ * ChessBase annotation color codes
+ */
+const CB_COLORS = {
+    R: '#e74c3c', G: '#2ecc71', B: '#3498db',
+    Y: '#f1c40f', C: '#1abc9c', M: '#9b59b6'
+};
 
-    // Tokenize: split into moves, parentheses, and move numbers
-    const tokens = tokenize(cleaned);
+/**
+ * SAN regex for move matching
+ */
+const SAN_REGEX = /^(O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|[a-h][1-8](?:=[QRBN])?[+#]?)/;
 
-    // Parse tokens into a move tree
-    const chess = new Chess(fen);
-    const mainLine = [];
+/**
+ * Parse comment text extracting ChessBase annotations:
+ *   [%cal Ge2e4,Re7e5] → arrows
+ *   [%csl Gd5,Re4]     → highlights
+ * Returns { text, arrows, highlights }
+ */
+function parseComment(raw) {
+    if (!raw) return { text: '', arrows: [], highlights: [] };
+    let text = raw;
+    const arrows = [];
+    const highlights = [];
 
-    parseTokens(tokens, chess, mainLine, fen);
+    // Parse [%cal ...] → arrows
+    text = text.replace(/\[%cal\s+([^\]]+)\]/gi, (_, content) => {
+        content.split(',').forEach(item => {
+            item = item.trim();
+            if (item.length >= 5) {
+                const colorChar = item[0].toUpperCase();
+                const from = item.substring(1, 3);
+                const to = item.substring(3, 5);
+                arrows.push({
+                    color: CB_COLORS[colorChar] || CB_COLORS.G,
+                    from, to
+                });
+            }
+        });
+        return '';
+    });
 
-    return mainLine;
+    // Parse [%csl ...] → highlights
+    text = text.replace(/\[%csl\s+([^\]]+)\]/gi, (_, content) => {
+        content.split(',').forEach(item => {
+            item = item.trim();
+            if (item.length >= 3) {
+                const colorChar = item[0].toUpperCase();
+                const square = item.substring(1, 3);
+                highlights.push({
+                    color: CB_COLORS[colorChar] || CB_COLORS.G,
+                    square
+                });
+            }
+        });
+        return '';
+    });
+
+    // Strip other ChessBase annotations we don't use
+    text = text.replace(/\[%(evp|mdl|clk|emt)\s+[^\]]*\]/gi, '');
+    text = text.trim();
+
+    return { text, arrows, highlights };
 }
 
 /**
- * Tokenize PGN move text into an array of tokens
+ * Tokenize PGN move text into structured tokens.
+ * Token types: MOVE, MOVE_NUMBER, COMMENT, VARIATION_START, VARIATION_END, NAG, RESULT
  */
 function tokenize(text) {
     const tokens = [];
     let i = 0;
-    while (i < text.length) {
+    const len = text.length;
+
+    while (i < len) {
         // Skip whitespace
         if (/\s/.test(text[i])) { i++; continue; }
 
-        // Opening paren — start of variation
-        if (text[i] === '(') {
-            tokens.push({ type: 'OPEN_PAREN' });
-            i++; continue;
-        }
-
-        // Closing paren — end of variation
-        if (text[i] === ')') {
-            tokens.push({ type: 'CLOSE_PAREN' });
-            i++; continue;
-        }
-
-        // Move number like "1." or "1..." — skip
-        if (/\d/.test(text[i])) {
-            let num = '';
-            while (i < text.length && /[\d.]/.test(text[i])) {
-                num += text[i]; i++;
+        // Comment { ... }
+        if (text[i] === '{') {
+            i++; // skip '{'
+            let comment = '';
+            let depth = 1;
+            while (i < len && depth > 0) {
+                if (text[i] === '{') depth++;
+                else if (text[i] === '}') { depth--; if (depth === 0) break; }
+                comment += text[i];
+                i++;
             }
-            // Skip whitespace after move number
-            while (i < text.length && /\s/.test(text[i])) i++;
+            i++; // skip '}'
+            tokens.push({ type: 'COMMENT', value: comment });
             continue;
         }
 
-        // SAN move token
+        // Variation start
+        if (text[i] === '(') {
+            tokens.push({ type: 'VARIATION_START' });
+            i++; continue;
+        }
+
+        // Variation end
+        if (text[i] === ')') {
+            tokens.push({ type: 'VARIATION_END' });
+            i++; continue;
+        }
+
+        // NAG: $1, $2, etc.
+        if (text[i] === '$') {
+            i++; // skip '$'
+            let num = '';
+            while (i < len && /\d/.test(text[i])) { num += text[i]; i++; }
+            if (num) tokens.push({ type: 'NAG', value: parseInt(num, 10) });
+            continue;
+        }
+
+        // Result: 1-0, 0-1, 1/2-1/2, *
+        if (text[i] === '*') {
+            tokens.push({ type: 'RESULT', value: '*' });
+            i++; continue;
+        }
+        if (i + 2 < len && text.substring(i, i + 3) === '1-0') {
+            tokens.push({ type: 'RESULT', value: '1-0' }); i += 3; continue;
+        }
+        if (i + 2 < len && text.substring(i, i + 3) === '0-1') {
+            tokens.push({ type: 'RESULT', value: '0-1' }); i += 3; continue;
+        }
+        if (i + 6 < len && text.substring(i, i + 7) === '1/2-1/2') {
+            tokens.push({ type: 'RESULT', value: '1/2-1/2' }); i += 7; continue;
+        }
+
+        // Move number: "1." or "1..."
+        if (/\d/.test(text[i])) {
+            let num = '';
+            while (i < len && /\d/.test(text[i])) { num += text[i]; i++; }
+            // Skip dots after move number
+            while (i < len && text[i] === '.') i++;
+            if (num) tokens.push({ type: 'MOVE_NUMBER', value: parseInt(num, 10) });
+            continue;
+        }
+
+        // SAN move (starts with letter or O for castling)
         if (/[a-zA-ZO]/.test(text[i])) {
-            let move = '';
-            while (i < text.length && /[a-zA-Z0-9+#=\-]/.test(text[i])) {
-                move += text[i]; i++;
+            const remaining = text.substring(i);
+            const match = remaining.match(SAN_REGEX);
+            if (match) {
+                const san = match[1];
+                i += san.length;
+                tokens.push({ type: 'MOVE', value: san });
+
+                // Check for annotation symbols immediately after move: !, ?, !!, ??, !?, ?!
+                while (i < len && /\s/.test(text[i])) i++; // skip whitespace
+                if (i < len && (text[i] === '!' || text[i] === '?')) {
+                    let ann = text[i]; i++;
+                    if (i < len && (text[i] === '!' || text[i] === '?')) {
+                        ann += text[i]; i++;
+                    }
+                    if (ANNOTATION_TO_NAG[ann] !== undefined) {
+                        tokens.push({ type: 'NAG', value: ANNOTATION_TO_NAG[ann] });
+                    }
+                }
+                continue;
             }
-            if (move) tokens.push({ type: 'MOVE', value: move });
+            // If no SAN match, skip the character
+            i++;
+            continue;
+        }
+
+        // Annotation symbols standalone: !, ?, etc
+        if (text[i] === '!' || text[i] === '?') {
+            let ann = text[i]; i++;
+            if (i < len && (text[i] === '!' || text[i] === '?')) {
+                ann += text[i]; i++;
+            }
+            if (ANNOTATION_TO_NAG[ann] !== undefined) {
+                tokens.push({ type: 'NAG', value: ANNOTATION_TO_NAG[ann] });
+            }
             continue;
         }
 
@@ -99,80 +217,166 @@ function tokenize(text) {
 }
 
 /**
- * Parse token stream into main line with alternatives
+ * Recursively parse a token sequence into a move node array.
+ * Each MoveNode: { move, comment, nags, arrows, highlights, variations, alternatives }
+ *
+ * @param {Array} tokens - Token array
+ * @param {Object} state - { pos: current position }
+ * @param {Chess} chess  - chess.js instance (mutated)
+ * @returns {Array<MoveNode>}
  */
-function parseTokens(tokens, chess, mainLine, startFen) {
-    let pos = 0;
+function parseSequence(tokens, state, chess) {
+    const moves = [];
+    let currentMoveNumber = 1;
 
-    while (pos < tokens.length) {
-        const token = tokens[pos];
+    while (state.pos < tokens.length) {
+        const token = tokens[state.pos];
 
-        if (token.type === 'CLOSE_PAREN') {
-            // End of current variation scope
+        // End of variation scope
+        if (token.type === 'VARIATION_END') {
             break;
         }
 
-        if (token.type === 'OPEN_PAREN') {
-            // Variation — this is an alternative to the LAST move in mainLine
-            pos++; // skip '('
+        // Skip results
+        if (token.type === 'RESULT') {
+            state.pos++;
+            continue;
+        }
 
-            // The variation replaces the last move played.
-            // We need to undo it and try the alternative.
-            const lastNode = mainLine[mainLine.length - 1];
-            if (lastNode) {
-                // Undo the last main line move to try the variation
+        // Track move numbers
+        if (token.type === 'MOVE_NUMBER') {
+            currentMoveNumber = token.value;
+            state.pos++;
+            continue;
+        }
+
+        // Actual move
+        if (token.type === 'MOVE') {
+            const isWhiteTurn = chess.turn() === 'w';
+            const fenBeforeMove = chess.fen();
+
+            let moveResult;
+            try {
+                moveResult = chess.move(token.value);
+            } catch (e) {
+                state.pos++;
+                continue;
+            }
+            if (!moveResult) { state.pos++; continue; }
+
+            const node = {
+                move: moveResult.san,
+                moveNumber: currentMoveNumber,
+                isWhite: isWhiteTurn,
+                comment: '',
+                nags: [],
+                arrows: [],
+                highlights: [],
+                variations: [],
+                alternatives: []  // backward compatibility
+            };
+
+            state.pos++;
+
+            // Collect NAGs and comments after the move
+            while (state.pos < tokens.length) {
+                const next = tokens[state.pos];
+                if (next.type === 'NAG') {
+                    node.nags.push(next.value);
+                    state.pos++;
+                } else if (next.type === 'COMMENT') {
+                    const parsed = parseComment(next.value);
+                    node.comment = (node.comment ? node.comment + ' ' : '') + parsed.text;
+                    node.arrows.push(...parsed.arrows);
+                    node.highlights.push(...parsed.highlights);
+                    state.pos++;
+                } else {
+                    break;
+                }
+            }
+
+            // Collect variations (recursive) — each ( ... ) after the move
+            while (state.pos < tokens.length && tokens[state.pos].type === 'VARIATION_START') {
+                state.pos++; // skip '('
+
+                // Save chess state before entering variation
+                const savedFen = chess.fen();
+                // Undo the mainline move to get the position BEFORE this move
                 chess.undo();
 
-                // Collect alternative moves within this variation
-                const altMoves = [];
-                let depth = 0;
-                while (pos < tokens.length) {
-                    if (tokens[pos].type === 'OPEN_PAREN') { depth++; pos++; continue; }
-                    if (tokens[pos].type === 'CLOSE_PAREN') {
-                        if (depth === 0) { pos++; break; }
-                        depth--; pos++; continue;
-                    }
-                    if (tokens[pos].type === 'MOVE' && depth === 0) {
-                        // Only capture the first move of the variation as an alternative
-                        if (altMoves.length === 0) {
-                            try {
-                                const tempChess = new Chess(chess.fen());
-                                const result = tempChess.move(tokens[pos].value);
-                                if (result) altMoves.push(result.san);
-                            } catch (e) { }
-                        }
-                    }
-                    pos++;
+                // Parse the variation recursively
+                const variationMoves = parseSequence(tokens, state, chess);
+
+                // Skip the closing ')'
+                if (state.pos < tokens.length && tokens[state.pos].type === 'VARIATION_END') {
+                    state.pos++;
                 }
 
-                // Add alternatives to the last main line node
-                for (const alt of altMoves) {
-                    if (!lastNode.alternatives.includes(alt) && alt !== lastNode.move) {
-                        lastNode.alternatives.push(alt);
+                if (variationMoves.length > 0) {
+                    node.variations.push(variationMoves);
+                    // Add first move of variation to alternatives (backward compat)
+                    const altSan = variationMoves[0].move;
+                    if (altSan !== node.move && !node.alternatives.includes(altSan)) {
+                        node.alternatives.push(altSan);
                     }
                 }
 
-                // Re-apply the main line move
-                try { chess.move(lastNode.move); } catch (e) { }
+                // Restore chess state (re-apply mainline move)
+                chess.load(savedFen);
             }
+
+            moves.push(node);
             continue;
         }
 
-        if (token.type === 'MOVE') {
-            try {
-                const result = chess.move(token.value);
-                if (result) {
-                    mainLine.push({ move: result.san, alternatives: [] });
-                }
-            } catch (e) {
-                // Skip invalid move
+        // Skip comments at the start of a sequence (game comment or variation comment)
+        if (token.type === 'COMMENT') {
+            // Attach to previous move if exists, otherwise skip
+            if (moves.length > 0) {
+                const parsed = parseComment(token.value);
+                const lastMove = moves[moves.length - 1];
+                lastMove.comment = (lastMove.comment ? lastMove.comment + ' ' : '') + parsed.text;
+                lastMove.arrows.push(...parsed.arrows);
+                lastMove.highlights.push(...parsed.highlights);
             }
-            pos++;
+            state.pos++;
             continue;
         }
 
-        pos++;
+        state.pos++;
     }
+
+    return moves;
+}
+
+/**
+ * Parse PGN move text into a full move tree with variations.
+ * Returns array of MoveNodes (mainline), each potentially containing
+ * nested variations arrays.
+ *
+ * MoveNode: {
+ *   move: "Nf3",           // SAN
+ *   moveNumber: 1,         // Move number
+ *   isWhite: true,         // White's move?
+ *   comment: "Good move",  // Text comment
+ *   nags: [1],             // NAG numbers
+ *   arrows: [{color, from, to}],     // [%cal] annotations
+ *   highlights: [{color, square}],   // [%csl] annotations
+ *   variations: [[MoveNode, ...]], // Alternative lines
+ *   alternatives: ["d4"]   // First moves of variations (backward compat)
+ * }
+ */
+function parseMoveTree(movesText, fen) {
+    if (!movesText || !movesText.trim()) return [];
+
+    const tokens = tokenize(movesText);
+    if (tokens.length === 0) return [];
+
+    const chess = new Chess(fen);
+    const state = { pos: 0 };
+    const moves = parseSequence(tokens, state, chess);
+
+    return moves;
 }
 
 /**
@@ -203,7 +407,7 @@ function parsePGN(pgnContent) {
             // Get FEN or use default starting position
             const fen = headers.FEN || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-            // Parse move tree (with variations)
+            // Parse move tree (with full variations)
             const moveTree = parseMoveTree(movesText, fen);
 
             if (moveTree.length > 0) {
@@ -261,8 +465,8 @@ router.post('/sets', authenticate, requireAdmin, upload.single('pgn_file'), asyn
 
         // Create puzzle set
         const [result] = await db.query(
-            'INSERT INTO puzzle_sets (name, description, difficulty, play_mode, solve_mode, puzzle_count, pgn_content, created_by) VALUES (?,?,?,?,?,?,?,?)',
-            [name, description || null, difficulty || 'beginner', mode, sMode, puzzles.length, pgnContent, req.user.id]
+            'INSERT INTO puzzle_sets (name, description, difficulty, play_mode, solve_mode, puzzle_count, pgn_content, created_by, group_name) VALUES (?,?,?,?,?,?,?,?,?)',
+            [name, description || null, difficulty || 'beginner', mode, sMode, puzzles.length, pgnContent, req.user.id, req.body.group_name || null]
         );
 
         const setId = result.insertId;
@@ -291,15 +495,29 @@ router.post('/sets', authenticate, requireAdmin, upload.single('pgn_file'), asyn
  */
 router.get('/sets', authenticate, async (req, res) => {
     try {
-        const [sets] = await db.query(`
-            SELECT ps.id, ps.name, ps.description, ps.difficulty, ps.play_mode,
-                   ps.puzzle_count, ps.is_active, ps.created_at,
-                   u.display_name as created_by_name
-            FROM puzzle_sets ps
-            LEFT JOIN users u ON ps.created_by = u.id
-            WHERE ps.is_active = 1
-            ORDER BY ps.created_at DESC
-        `);
+        let sets;
+        try {
+            [sets] = await db.query(`
+                SELECT ps.id, ps.name, ps.group_name, ps.description, ps.difficulty, ps.play_mode,
+                       ps.solve_mode, ps.puzzle_count, ps.is_active, ps.created_at,
+                       u.display_name as created_by_name
+                FROM puzzle_sets ps
+                LEFT JOIN users u ON ps.created_by = u.id
+                WHERE ps.is_active = 1
+                ORDER BY ps.created_at DESC
+            `);
+        } catch (colErr) {
+            // Fallback if group_name column doesn't exist yet
+            [sets] = await db.query(`
+                SELECT ps.id, ps.name, NULL as group_name, ps.description, ps.difficulty, ps.play_mode,
+                       ps.solve_mode, ps.puzzle_count, ps.is_active, ps.created_at,
+                       u.display_name as created_by_name
+                FROM puzzle_sets ps
+                LEFT JOIN users u ON ps.created_by = u.id
+                WHERE ps.is_active = 1
+                ORDER BY ps.created_at DESC
+            `);
+        }
 
         // Get user progress for each set
         for (const set of sets) {
@@ -574,6 +792,47 @@ router.delete('/sets/:id', authenticate, requireAdmin, async (req, res) => {
         res.json({ message: 'Đã xóa bộ puzzle' });
     } catch (err) {
         res.status(500).json({ error: 'Lỗi xóa' });
+    }
+});
+
+/**
+ * PUT /api/puzzles/sets/:id — Update puzzle set (admin only)
+ */
+router.put('/sets/:id', authenticate, requireAdmin, async (req, res) => {
+    try {
+        const { name, description, difficulty, play_mode, solve_mode, group_name } = req.body;
+        const fields = [];
+        const values = [];
+
+        if (name !== undefined) { fields.push('name = ?'); values.push(name); }
+        if (description !== undefined) { fields.push('description = ?'); values.push(description || null); }
+        if (difficulty !== undefined) { fields.push('difficulty = ?'); values.push(difficulty); }
+        if (play_mode !== undefined) { fields.push('play_mode = ?'); values.push(play_mode); }
+        if (solve_mode !== undefined) { fields.push('solve_mode = ?'); values.push(solve_mode); }
+        if (group_name !== undefined) { fields.push('group_name = ?'); values.push(group_name || null); }
+
+        if (fields.length === 0) return res.status(400).json({ error: 'Không có gì để cập nhật' });
+
+        values.push(req.params.id);
+        await db.query(`UPDATE puzzle_sets SET ${fields.join(', ')} WHERE id = ?`, values);
+        res.json({ message: 'Đã cập nhật!' });
+    } catch (err) {
+        console.error('Update puzzle set error:', err);
+        res.status(500).json({ error: 'Lỗi cập nhật' });
+    }
+});
+
+/**
+ * GET /api/puzzles/groups — Get all distinct group names
+ */
+router.get('/groups', authenticate, async (req, res) => {
+    try {
+        const [groups] = await db.query(
+            `SELECT DISTINCT group_name FROM puzzle_sets WHERE is_active = 1 AND group_name IS NOT NULL ORDER BY group_name`
+        );
+        res.json({ groups: groups.map(g => g.group_name) });
+    } catch (err) {
+        res.status(500).json({ error: 'Lỗi lấy danh sách nhóm' });
     }
 });
 

@@ -1071,14 +1071,16 @@
                     // Determine which side is attacking and which is defending this turn
                     const attackerName = entry.attacker;
                     const targetName = entry.target;
+                    const attackerId = entry.attackerId;
+                    const targetId = entry.targetId;
                     let fromSide, toSide, fromIdx, toIdx, fromElem;
 
                     if (entry.side === 'atk') {
                         // Attacker team's dragon attacks defender team's dragon
                         fromSide = 'atk';
                         toSide = 'def';
-                        fromIdx = this.atkDragons.findIndex(d => d.name === attackerName);
-                        toIdx = this.defDragons.findIndex(d => d.name === targetName);
+                        fromIdx = attackerId ? this.atkDragons.findIndex(d => d.id === attackerId) : this.atkDragons.findIndex(d => d.name === attackerName);
+                        toIdx = targetId ? this.defDragons.findIndex(d => d.id === targetId) : this.defDragons.findIndex(d => d.name === targetName);
                         if (fromIdx < 0) fromIdx = 0;
                         if (toIdx < 0) toIdx = 0;
                         fromElem = this.atkDragons[fromIdx]?.element || 'fire';
@@ -1086,8 +1088,8 @@
                         // Defender team's dragon attacks attacker team's dragon
                         fromSide = 'def';
                         toSide = 'atk';
-                        fromIdx = this.defDragons.findIndex(d => d.name === attackerName);
-                        toIdx = this.atkDragons.findIndex(d => d.name === targetName);
+                        fromIdx = attackerId ? this.defDragons.findIndex(d => d.id === attackerId) : this.defDragons.findIndex(d => d.name === attackerName);
+                        toIdx = targetId ? this.atkDragons.findIndex(d => d.id === targetId) : this.atkDragons.findIndex(d => d.name === targetName);
                         if (fromIdx < 0) fromIdx = 0;
                         if (toIdx < 0) toIdx = 0;
                         fromElem = this.defDragons[fromIdx]?.element || 'water';
@@ -1220,6 +1222,9 @@
                 const proj = document.getElementById('fire-projectile');
                 if (!fromSlot || !toSlot || !proj) return;
 
+                // Play element-specific attack sound
+                this.playAttackSound(element);
+
                 const fromRect = fromSlot.getBoundingClientRect();
                 const toRect = toSlot.getBoundingClientRect();
                 const arenaRect = document.querySelector('.battle-5v5').getBoundingClientRect();
@@ -1243,6 +1248,105 @@
 
                 await this.delay(400);
                 proj.style.opacity = '0';
+            },
+
+            // 7 unique element-based attack sounds using Web Audio API
+            playAttackSound(element) {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const gain = ctx.createGain();
+                    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                    gain.connect(ctx.destination);
+
+                    const soundConfigs = {
+                        metal: () => {
+                            // Metallic clang — high-freq square wave with fast decay
+                            const osc = ctx.createOscillator();
+                            osc.type = 'square';
+                            osc.frequency.setValueAtTime(1200, ctx.currentTime);
+                            osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.15);
+                            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+                            osc.connect(gain); osc.start(); osc.stop(ctx.currentTime + 0.2);
+                        },
+                        wood: () => {
+                            // Organic whoosh — noise-like with bandpass
+                            const osc = ctx.createOscillator();
+                            osc.type = 'sawtooth';
+                            osc.frequency.setValueAtTime(200, ctx.currentTime);
+                            osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.15);
+                            osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.3);
+                            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                            osc.connect(gain); osc.start(); osc.stop(ctx.currentTime + 0.3);
+                        },
+                        water: () => {
+                            // Bubbly splash — sine wave with vibrato
+                            const osc = ctx.createOscillator();
+                            const lfo = ctx.createOscillator();
+                            const lfoGain = ctx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(600, ctx.currentTime);
+                            osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.3);
+                            lfo.type = 'sine'; lfo.frequency.value = 25;
+                            lfoGain.gain.value = 80;
+                            lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+                            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                            osc.connect(gain); osc.start(); lfo.start(); osc.stop(ctx.currentTime + 0.35); lfo.stop(ctx.currentTime + 0.35);
+                        },
+                        fire: () => {
+                            // Rising roar — sawtooth sweep up
+                            const osc = ctx.createOscillator();
+                            osc.type = 'sawtooth';
+                            osc.frequency.setValueAtTime(100, ctx.currentTime);
+                            osc.frequency.exponentialRampToValueAtTime(1500, ctx.currentTime + 0.2);
+                            gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                            gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.1);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                            osc.connect(gain); osc.start(); osc.stop(ctx.currentTime + 0.3);
+                        },
+                        earth: () => {
+                            // Deep rumble — low triangle wave
+                            const osc = ctx.createOscillator();
+                            osc.type = 'triangle';
+                            osc.frequency.setValueAtTime(80, ctx.currentTime);
+                            osc.frequency.linearRampToValueAtTime(40, ctx.currentTime + 0.4);
+                            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+                            osc.connect(gain); osc.start(); osc.stop(ctx.currentTime + 0.4);
+                        },
+                        light: () => {
+                            // Bright chime — dual high-freq sines
+                            const osc1 = ctx.createOscillator();
+                            const osc2 = ctx.createOscillator();
+                            osc1.type = 'sine'; osc1.frequency.value = 1047;
+                            osc2.type = 'sine'; osc2.frequency.value = 1319;
+                            const g2 = ctx.createGain(); g2.gain.value = 0.08;
+                            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+                            osc1.connect(gain); osc2.connect(g2); g2.connect(ctx.destination);
+                            osc1.start(); osc2.start(); osc1.stop(ctx.currentTime + 0.4); osc2.stop(ctx.currentTime + 0.4);
+                        },
+                        dark: () => {
+                            // Ominous hum — low square with slow LFO
+                            const osc = ctx.createOscillator();
+                            const lfo = ctx.createOscillator();
+                            const lfoGain = ctx.createGain();
+                            osc.type = 'square';
+                            osc.frequency.setValueAtTime(110, ctx.currentTime);
+                            lfo.type = 'sine'; lfo.frequency.value = 6;
+                            lfoGain.gain.value = 30;
+                            lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+                            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+                            osc.connect(gain); osc.start(); lfo.start(); osc.stop(ctx.currentTime + 0.45); lfo.stop(ctx.currentTime + 0.45);
+                        }
+                    };
+
+                    const playFn = soundConfigs[element] || soundConfigs.fire;
+                    playFn();
+                } catch (e) { /* Audio not supported */ }
             },
 
             addLog(text, isCrit) {

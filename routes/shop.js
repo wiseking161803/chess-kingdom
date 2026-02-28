@@ -161,20 +161,48 @@ router.post('/purchase', authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/shop/inventory — User's inventory
+ * GET /api/shop/inventory — User's unified inventory (items + eggs + equipment)
  */
 router.get('/inventory', authenticate, async (req, res) => {
     try {
-        const [inventory] = await db.query(`
-            SELECT ui.quantity, ui.acquired_at, si.*
+        const userId = req.user.id;
+
+        // 1. Shop items from user_inventory
+        const [items] = await db.query(`
+            SELECT ui.quantity, ui.acquired_at, si.id as item_id, si.name, si.description,
+                   si.icon_url, si.category, si.cost, si.cost_type
             FROM user_inventory ui
             JOIN shop_items si ON ui.item_id = si.id
-            WHERE ui.user_id = ?
+            WHERE ui.user_id = ? AND ui.quantity > 0
             ORDER BY ui.acquired_at DESC
-        `, [req.user.id]);
+        `, [userId]);
 
-        res.json({ inventory });
+        // 2. Pending dragon eggs
+        const [eggs] = await db.query(
+            'SELECT id, name, hatch_at, hatched, created_at FROM dragon_eggs WHERE user_id = ? AND hatched = 0 ORDER BY hatch_at',
+            [userId]
+        );
+
+        // 3. Unequipped equipment (not assigned to any dragon)
+        const [equipment] = await db.query(`
+            SELECT ude.id as user_eq_id, de.*
+            FROM user_dragon_equipment ude
+            JOIN dragon_equipment de ON ude.equipment_id = de.id
+            WHERE ude.user_id = ? AND ude.dragon_id IS NULL
+            ORDER BY de.rarity DESC, de.name
+        `, [userId]);
+
+        res.json({
+            inventory: items,
+            eggs: eggs.map(e => ({
+                ...e,
+                ready: new Date(e.hatch_at) <= new Date(),
+                time_left: Math.max(0, Math.floor((new Date(e.hatch_at) - new Date()) / 1000))
+            })),
+            equipment
+        });
     } catch (err) {
+        console.error('Inventory error:', err);
         res.status(500).json({ error: 'Lỗi lấy kho' });
     }
 });

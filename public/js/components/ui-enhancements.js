@@ -122,7 +122,7 @@ const VillageAmbience = {
         const dur = 12 + Math.random() * 8;
         bird.textContent = '🐦';
         bird.style.cssText = `position:absolute;top:${top}%;left:-5%;font-size:${16 + Math.random() * 12}px;
-            opacity:0.6;animation:birdFly ${dur}s linear forwards;`;
+            opacity:0.6;animation:birdFly ${dur}s linear forwards;transform:scaleX(-1);`;
         layer.appendChild(bird);
         setTimeout(() => bird.remove(), dur * 1000);
     },

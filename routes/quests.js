@@ -105,7 +105,7 @@ router.get('/weekly', authenticate, async (req, res) => {
 });
 
 /**
- * POST /api/quests/:id/complete — Mark quest as completed
+ * POST /api/quests/:id/complete — Mark quest as completed (with auto-verification)
  */
 router.post('/:id/complete', authenticate, async (req, res) => {
     try {
@@ -126,7 +126,13 @@ router.post('/:id/complete', authenticate, async (req, res) => {
             [userId, questId, periodKey]
         );
         if (existing.length > 0) {
-            return res.status(400).json({ error: 'Bạn đã hoàn thành nhiệm vụ này' });
+            return res.status(400).json({ error: 'Bạn đã hoàn thành nhiệm vụ này rồi' });
+        }
+
+        // ========== AUTO-VERIFICATION ==========
+        const verified = await verifyQuestCompletion(userId, quest);
+        if (!verified) {
+            return res.status(400).json({ error: '❌ Bạn chưa hoàn thành nhiệm vụ này! Hãy thực hiện trước.' });
         }
 
         await db.query(
@@ -134,21 +140,7 @@ router.post('/:id/complete', authenticate, async (req, res) => {
             [userId, questId, periodKey]
         );
 
-        // Award stars
-        if (quest.stars_reward > 0) {
-            await db.query(
-                'UPDATE user_currencies SET knowledge_stars = knowledge_stars + ?, total_stars_earned = total_stars_earned + ? WHERE user_id = ?',
-                [quest.stars_reward, quest.stars_reward, userId]
-            );
-
-            const [curr] = await db.query('SELECT knowledge_stars FROM user_currencies WHERE user_id = ?', [userId]);
-            await db.query(
-                'INSERT INTO currency_transactions (user_id, currency_type, amount, balance_after, source, description) VALUES (?,?,?,?,?,?)',
-                [userId, 'stars', quest.stars_reward, curr[0]?.knowledge_stars || 0, 'quest', quest.title]
-            );
-        }
-
-        // Award coins (for puzzle-based quests)
+        // Award coins only (no stars)
         const coinsReward = quest.coins_reward || 0;
         if (coinsReward > 0) {
             await db.query(
@@ -163,18 +155,142 @@ router.post('/:id/complete', authenticate, async (req, res) => {
             );
         }
 
-        let msg = `Hoàn thành: ${quest.title}! +${quest.stars_reward} ⭐`;
-        if (coinsReward > 0) msg += ` +${coinsReward} 🪙`;
+        let msg = `✅ Hoàn thành: ${quest.title}!`;
+        if (coinsReward > 0) msg += ` +${coinsReward.toLocaleString()} 🪙`;
 
         res.json({
             message: msg,
-            stars_earned: quest.stars_reward,
             coins_earned: coinsReward
         });
     } catch (err) {
+        console.error('Quest complete error:', err);
         res.status(500).json({ error: 'Lỗi hoàn thành nhiệm vụ' });
     }
 });
+
+/**
+ * Auto-verify quest completion based on quest title/type
+ */
+async function verifyQuestCompletion(userId, quest) {
+    const title = quest.title || '';
+    const dayKey = getDayKey();
+
+    try {
+        // === DAILY QUESTS ===
+        if (title.includes('Đăng nhập')) {
+            // Login: always true if they're calling this endpoint (they're logged in)
+            return true;
+        }
+
+        if (title.includes('Kiếm ít nhất 3 sao')) {
+            const [rows] = await db.query(
+                "SELECT COALESCE(SUM(amount),0) as total FROM currency_transactions WHERE user_id = ? AND currency_type = 'stars' AND amount > 0 AND DATE(created_at) = ?",
+                [userId, dayKey]
+            );
+            return (rows[0]?.total || 0) >= 3;
+        }
+
+        if (title.includes('Kiếm ít nhất 10 sao')) {
+            const [rows] = await db.query(
+                "SELECT COALESCE(SUM(amount),0) as total FROM currency_transactions WHERE user_id = ? AND currency_type = 'stars' AND amount > 0 AND DATE(created_at) = ?",
+                [userId, dayKey]
+            );
+            return (rows[0]?.total || 0) >= 10;
+        }
+
+        if (title.includes('Cho rồng ăn')) {
+            const count = title.match(/(\d+)/)?.[1] || 1;
+            const [rows] = await db.query(
+                "SELECT COUNT(*) as cnt FROM currency_transactions WHERE user_id = ? AND source = 'dragon_feed' AND DATE(created_at) = ?",
+                [userId, dayKey]
+            );
+            return (rows[0]?.cnt || 0) >= parseInt(count);
+        }
+
+        if (title.includes('Tháp Kỳ Vương')) {
+            const count = title.match(/(\d+)/)?.[1] || 1;
+            const [rows] = await db.query(
+                "SELECT COUNT(*) as cnt FROM user_quest_completions uqc JOIN quest_templates qt ON uqc.quest_id = qt.id WHERE uqc.user_id = ? AND qt.url IS NOT NULL AND uqc.period_key = ?",
+                [userId, dayKey]
+            );
+            return (rows[0]?.cnt || 0) >= parseInt(count);
+        }
+
+        if (title.includes('Thu hoạch vườn')) {
+            const count = title.match(/(\d+)/)?.[1] || 1;
+            const [rows] = await db.query(
+                "SELECT COUNT(*) as cnt FROM currency_transactions WHERE user_id = ? AND source = 'garden' AND DATE(created_at) = ?",
+                [userId, dayKey]
+            );
+            return (rows[0]?.cnt || 0) >= parseInt(count);
+        }
+
+        // === WEEKLY QUESTS ===
+        if (title.includes('Đăng nhập 5 ngày')) {
+            const weekKey = getWeekKey();
+            const [rows] = await db.query(
+                "SELECT COUNT(DISTINCT DATE(created_at)) as days FROM currency_transactions WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+                [userId]
+            );
+            return (rows[0]?.days || 0) >= 5;
+        }
+
+        if (title.includes('Kiếm tổng 50 sao')) {
+            const [rows] = await db.query(
+                "SELECT COALESCE(SUM(amount),0) as total FROM currency_transactions WHERE user_id = ? AND currency_type = 'stars' AND amount > 0 AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+                [userId]
+            );
+            return (rows[0]?.total || 0) >= 50;
+        }
+
+        if (title.includes('Hoàn thành 5 nhiệm vụ')) {
+            const weekKey = getWeekKey();
+            const [rows] = await db.query(
+                "SELECT COUNT(*) as cnt FROM user_quest_completions uqc JOIN quest_templates qt ON uqc.quest_id = qt.id WHERE uqc.user_id = ? AND qt.url IS NOT NULL AND uqc.period_key = ?",
+                [userId, weekKey]
+            );
+            return (rows[0]?.cnt || 0) >= 5;
+        }
+
+        if (title.includes('3 trận chiến')) {
+            const [rows] = await db.query(
+                "SELECT COUNT(*) as cnt FROM dragon_battles WHERE attacker_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+                [userId]
+            );
+            return (rows[0]?.cnt || 0) >= 3;
+        }
+
+        if (title.includes('Cho rồng ăn 5 lần')) {
+            const [rows] = await db.query(
+                "SELECT COUNT(*) as cnt FROM currency_transactions WHERE user_id = ? AND source = 'dragon_feed' AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+                [userId]
+            );
+            return (rows[0]?.cnt || 0) >= 5;
+        }
+
+        if (title.includes('Thu hoạch vườn cây 5 lần')) {
+            const [rows] = await db.query(
+                "SELECT COUNT(*) as cnt FROM currency_transactions WHERE user_id = ? AND source = 'garden' AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)",
+                [userId]
+            );
+            return (rows[0]?.cnt || 0) >= 5;
+        }
+
+        if (title.includes('Top 10')) {
+            const [rows] = await db.query(
+                "SELECT rank_position FROM dragon_arena_rankings WHERE user_id = ? AND rank_position <= 10",
+                [userId]
+            );
+            return rows.length > 0;
+        }
+
+        // Unknown quest type — don't auto-verify
+        return false;
+    } catch (e) {
+        console.error('Quest verification error:', e.message);
+        return false;
+    }
+}
 
 // ============================================
 // ADMIN QUEST CRUD

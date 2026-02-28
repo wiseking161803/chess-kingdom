@@ -460,16 +460,46 @@ router.post('/gacha', authenticate, async (req, res) => {
 
         const rarityLabels = { common: '🟢 Thường', rare: '🔵 Hiếm', epic: '🟣 Sử Thi', legendary: '🟡 Huyền Thoại', mythic: '🔴 Thần Thoại' };
 
-        // Helper: weighted random pick
-        function weightedPick() {
-            const totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
-            let random = Math.random() * totalWeight;
-            let picked = pool[0];
-            for (const item of pool) {
-                random -= item.weight;
-                if (random <= 0) { picked = item; break; }
+        // Rarity-first gacha: roll rarity by fixed percentages, then pick random item
+        const RARITY_RATES = [
+            { rarity: 'mythic', chance: 0.001 },  // 0.1%
+            { rarity: 'legendary', chance: 0.009 },  // 0.9%
+            { rarity: 'epic', chance: 0.05 },   // 5%
+            { rarity: 'rare', chance: 0.30 },   // 30%
+            { rarity: 'common', chance: 0.64 },    // 64%
+        ];
+
+        // Group pool by rarity
+        const poolByRarity = {};
+        for (const item of pool) {
+            if (!poolByRarity[item.rarity]) poolByRarity[item.rarity] = [];
+            poolByRarity[item.rarity].push(item);
+        }
+
+        function rarityPick() {
+            const roll = Math.random();
+            let cumulative = 0;
+            let selectedRarity = 'common';
+            for (const { rarity, chance } of RARITY_RATES) {
+                cumulative += chance;
+                if (roll < cumulative) {
+                    selectedRarity = rarity;
+                    break;
+                }
             }
-            return picked;
+            // Pick random item from that rarity, fallback to lower rarity if empty
+            const fallbackOrder = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+            let items = poolByRarity[selectedRarity];
+            if (!items || items.length === 0) {
+                // Fallback: try lower rarities
+                for (const r of fallbackOrder) {
+                    if (poolByRarity[r] && poolByRarity[r].length > 0) {
+                        items = poolByRarity[r];
+                        break;
+                    }
+                }
+            }
+            return items[Math.floor(Math.random() * items.length)];
         }
 
         let results = [];
@@ -477,7 +507,7 @@ router.post('/gacha', authenticate, async (req, res) => {
         if (multi) {
             // 10-ticket pull: 9 normal + 1 guaranteed epic (sử thi)
             for (let i = 0; i < 9; i++) {
-                results.push(weightedPick());
+                results.push(rarityPick());
             }
             // 10th item: guaranteed epic
             const epics = pool.filter(p => p.rarity === 'epic');
@@ -494,7 +524,7 @@ router.post('/gacha', authenticate, async (req, res) => {
                 [results[i], results[j]] = [results[j], results[i]];
             }
         } else {
-            results.push(weightedPick());
+            results.push(rarityPick());
         }
 
         // Deduct tickets
@@ -973,6 +1003,74 @@ router.post('/evolve', authenticate, async (req, res) => {
     } catch (err) {
         console.error('Evolve error:', err);
         res.status(500).json({ error: 'Lỗi thăng cấp rồng' });
+    }
+});
+
+/**
+ * POST /api/dragons/rename — Rename a dragon
+ */
+router.post('/rename', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { dragon_id, new_name } = req.body;
+
+        if (!dragon_id || !new_name) {
+            return res.status(400).json({ error: 'Thiếu thông tin!' });
+        }
+
+        const trimmed = new_name.trim();
+        if (trimmed.length < 2 || trimmed.length > 20) {
+            return res.status(400).json({ error: 'Tên phải từ 2-20 ký tự!' });
+        }
+
+        // Check ownership
+        const [dragon] = await db.query('SELECT id FROM user_dragons WHERE id = ? AND user_id = ?', [dragon_id, userId]);
+        if (dragon.length === 0) {
+            return res.status(404).json({ error: 'Không tìm thấy rồng!' });
+        }
+
+        // Check duplicate name within same user
+        const [dupes] = await db.query(
+            'SELECT id FROM user_dragons WHERE user_id = ? AND name = ? AND id != ?',
+            [userId, trimmed, dragon_id]
+        );
+        if (dupes.length > 0) {
+            return res.status(400).json({ error: 'Bạn đã có rồng tên này rồi! Chọn tên khác.' });
+        }
+
+        await db.query('UPDATE user_dragons SET name = ? WHERE id = ?', [trimmed, dragon_id]);
+        res.json({ message: `✅ Đổi tên thành công: ${trimmed}`, new_name: trimmed });
+    } catch (err) {
+        console.error('Rename error:', err);
+        res.status(500).json({ error: 'Lỗi đổi tên' });
+    }
+});
+
+/**
+ * POST /api/dragons/fix-duplicate-names — Auto-fix duplicate names for current user
+ */
+router.post('/fix-duplicate-names', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [dragons] = await db.query('SELECT id, name FROM user_dragons WHERE user_id = ? ORDER BY id', [userId]);
+
+        const nameCounts = {};
+        let fixed = 0;
+        for (const d of dragons) {
+            if (!nameCounts[d.name]) {
+                nameCounts[d.name] = 1;
+            } else {
+                nameCounts[d.name]++;
+                const newName = `${d.name} (${nameCounts[d.name]})`;
+                await db.query('UPDATE user_dragons SET name = ? WHERE id = ?', [newName, d.id]);
+                fixed++;
+            }
+        }
+
+        res.json({ message: fixed > 0 ? `✅ Đã sửa ${fixed} tên trùng!` : '✅ Không có tên trùng!', fixed });
+    } catch (err) {
+        console.error('Fix dupes error:', err);
+        res.status(500).json({ error: 'Lỗi sửa tên trùng' });
     }
 });
 

@@ -18,8 +18,14 @@ const ShopPage = {
                 const limitBadge = item.daily_limit ? `<span class="shop-limit-badge">📅 ${item.daily_limit}/ngày</span>`
                     : item.weekly_limit ? `<span class="shop-limit-badge">📆 ${item.weekly_limit}/tuần</span>`
                         : '';
+                const catMap = (cat) => {
+                    if (['dragon_food', 'buff'].includes(cat)) return 'dragon_food';
+                    if (['seed', 'garden'].includes(cat)) return 'garden';
+                    if (['dragon_egg', 'special'].includes(cat)) return 'special';
+                    return cat || 'other';
+                };
                 return `
-                <div class="shop-card">
+                <div class="shop-card" data-category="${catMap(item.category)}">
                     <div class="shop-card-icon">${item.icon_url || '🎁'}</div>
                     <div class="shop-card-body">
                         <div class="shop-card-name">${item.name} ${limitBadge}</div>
@@ -52,11 +58,16 @@ const ShopPage = {
                     <div class="tabs">
                         <button class="tab active" onclick="ShopPage.switchTab('shop', this)">🛒 Cửa Tiệm</button>
                         <button class="tab" onclick="ShopPage.switchTab('premium', this)">💎 Nạp Tiền</button>
-                        <button class="tab" onclick="ShopPage.switchTab('inventory', this)">🎒 Kho Đồ</button>
                     </div>
 
                     <div id="shop-tab">
-                        <div class="shop-grid">${itemsHTML}</div>
+                        <div id="shop-category-tabs" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+                            <button class="btn btn-sm active" onclick="ShopPage.filterCategory('all', this)" style="font-size:0.78rem;padding:6px 12px;border-radius:8px;font-weight:600;background:linear-gradient(135deg,rgba(108,92,231,0.3),rgba(168,85,247,0.2));border:2px solid rgba(168,85,247,0.5);color:#a855f7">📦 Tất cả</button>
+                            <button class="btn btn-sm" onclick="ShopPage.filterCategory('dragon_food', this)" style="font-size:0.78rem;padding:6px 12px;border-radius:8px;font-weight:600;background:rgba(255,255,255,0.04);border:2px solid rgba(255,255,255,0.12)">🍖 Rồng</button>
+                            <button class="btn btn-sm" onclick="ShopPage.filterCategory('garden', this)" style="font-size:0.78rem;padding:6px 12px;border-radius:8px;font-weight:600;background:rgba(255,255,255,0.04);border:2px solid rgba(255,255,255,0.12)">🌱 Hạt giống</button>
+                            <button class="btn btn-sm" onclick="ShopPage.filterCategory('special', this)" style="font-size:0.78rem;padding:6px 12px;border-radius:8px;font-weight:600;background:rgba(255,255,255,0.04);border:2px solid rgba(255,255,255,0.12)">✨ Đặc biệt</button>
+                        </div>
+                        <div class="shop-grid" id="shop-items-grid">${itemsHTML}</div>
                     </div>
                     <div id="premium-tab" class="hidden">
                         <div id="premium-content">Đang tải...</div>
@@ -93,14 +104,37 @@ const ShopPage = {
     },
 
     switchTab(tab, btn) {
-        document.querySelectorAll('#shop-modal .tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('#shop-modal .tabs .tab').forEach(t => t.classList.remove('active'));
         btn.classList.add('active');
-        document.getElementById('shop-tab').classList.toggle('hidden', tab !== 'shop');
-        document.getElementById('premium-tab').classList.toggle('hidden', tab !== 'premium');
-        document.getElementById('inventory-tab').classList.toggle('hidden', tab !== 'inventory');
-
-        if (tab === 'inventory') this.loadInventory();
+        ['shop-tab', 'premium-tab', 'inventory-tab'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('hidden', id !== tab + '-tab');
+        });
         if (tab === 'premium') this.loadPremium();
+        if (tab === 'inventory') this.loadInventory();
+    },
+
+    filterCategory(category, btn) {
+        // Update button styles
+        document.querySelectorAll('#shop-category-tabs button').forEach(b => {
+            b.style.background = 'rgba(255,255,255,0.04)';
+            b.style.borderColor = 'rgba(255,255,255,0.12)';
+            b.style.color = '';
+            b.classList.remove('active');
+        });
+        btn.style.background = 'linear-gradient(135deg,rgba(108,92,231,0.3),rgba(168,85,247,0.2))';
+        btn.style.borderColor = 'rgba(168,85,247,0.5)';
+        btn.style.color = '#a855f7';
+        btn.classList.add('active');
+
+        // Filter items
+        document.querySelectorAll('#shop-items-grid .shop-card').forEach(card => {
+            if (category === 'all') {
+                card.style.display = '';
+            } else {
+                card.style.display = card.dataset.category === category ? '' : 'none';
+            }
+        });
     },
 
     async loadPremium() {
@@ -162,24 +196,73 @@ const ShopPage = {
         try {
             const data = await API.get('/shop/inventory');
             const container = document.getElementById('inventory-content');
+            let html = '';
 
-            if (data.inventory.length === 0) {
+            const totalItems = (data.inventory?.length || 0) + (data.eggs?.length || 0) + (data.equipment?.length || 0);
+            if (totalItems === 0) {
                 container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎒</div><div class="empty-state-text">Kho đồ trống</div></div>';
                 return;
             }
 
-            container.innerHTML = data.inventory.map(item => `
-                <div class="quest-card">
-                    <div class="quest-icon" style="font-size:2rem;background:var(--bg-main);">${item.icon_url || '🎁'}</div>
-                    <div class="quest-info">
-                        <div class="quest-title">${item.name}</div>
-                        <div class="text-small text-muted">${item.description || ''}</div>
-                    </div>
-                    <div class="stat-badge" style="background:var(--bg-main);color:var(--text-primary);">
-                        x${item.quantity}
-                    </div>
-                </div>
-            `).join('');
+            // === DRAGON EGGS ===
+            if (data.eggs && data.eggs.length > 0) {
+                html += `<div style="margin-bottom:12px">
+                    <div style="font-size:0.85rem;font-weight:700;margin-bottom:6px;color:#f39c12">🥚 Trứng Rồng (${data.eggs.length})</div>`;
+                for (const egg of data.eggs) {
+                    const ready = egg.ready;
+                    const mins = Math.floor(egg.time_left / 60);
+                    const hrs = Math.floor(mins / 60);
+                    const timeStr = ready ? '✅ Sẵn sàng nở!' : `⏳ Còn ${hrs}h ${mins % 60}m`;
+                    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(243,156,18,0.08);border:1.5px solid rgba(243,156,18,0.25);margin-bottom:6px">
+                        <div style="font-size:1.8rem">🥚</div>
+                        <div style="flex:1;min-width:0">
+                            <div style="font-weight:700;font-size:0.85rem">${egg.name || 'Trứng Rồng'}</div>
+                            <div style="font-size:0.72rem;color:${ready ? '#2ecc71' : '#f39c12'}">${timeStr}</div>
+                        </div>
+                        ${ready ? `<button class="btn btn-primary btn-sm" onclick="window.location.href='/dragon.html'" style="font-size:0.75rem;padding:5px 10px;white-space:nowrap">🐣 Nở</button>` : ''}
+                    </div>`;
+                }
+                html += '</div>';
+            }
+
+            // === UNEQUIPPED EQUIPMENT ===
+            if (data.equipment && data.equipment.length > 0) {
+                const rarityColors = { common: '#9E9E9E', rare: '#2196F3', epic: '#9C27B0', legendary: '#FF9800', mythic: '#FF1493' };
+                const rarityNames = { common: 'Thường', rare: 'Hiếm', epic: 'Sử Thi', legendary: 'Huyền Thoại', mythic: 'Thần Thoại' };
+                html += `<div style="margin-bottom:12px">
+                    <div style="font-size:0.85rem;font-weight:700;margin-bottom:6px;color:#9b59b6">⚔️ Trang Bị Chưa Đeo (${data.equipment.length})</div>`;
+                for (const eq of data.equipment) {
+                    const rc = rarityColors[eq.rarity] || '#666';
+                    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(155,89,182,0.06);border:1.5px solid ${rc}40;margin-bottom:6px">
+                        <div style="font-size:1.6rem">${eq.icon || '⚔️'}</div>
+                        <div style="flex:1;min-width:0">
+                            <div style="font-weight:700;font-size:0.85rem;color:${rc}">${eq.name}</div>
+                            <div style="font-size:0.7rem;opacity:0.6">${rarityNames[eq.rarity] || eq.rarity} · ${eq.slot || ''}</div>
+                        </div>
+                        <button class="btn btn-sm" onclick="window.location.href='/dragon.html'" style="font-size:0.72rem;padding:4px 8px;background:${rc}20;border:1px solid ${rc}50;color:${rc}">Trang bị</button>
+                    </div>`;
+                }
+                html += '</div>';
+            }
+
+            // === CONSUMABLE ITEMS ===
+            if (data.inventory && data.inventory.length > 0) {
+                html += `<div style="margin-bottom:12px">
+                    <div style="font-size:0.85rem;font-weight:700;margin-bottom:6px;color:#3498db">🎒 Vật Phẩm (${data.inventory.length})</div>`;
+                for (const item of data.inventory) {
+                    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(52,152,219,0.06);border:1.5px solid rgba(52,152,219,0.2);margin-bottom:6px">
+                        <div style="font-size:1.6rem">${item.icon_url || '🎁'}</div>
+                        <div style="flex:1;min-width:0">
+                            <div style="font-weight:700;font-size:0.85rem">${item.name}</div>
+                            <div style="font-size:0.7rem;opacity:0.5">${item.description || item.category || ''}</div>
+                        </div>
+                        <div style="font-weight:700;font-size:0.9rem;color:#3498db">x${item.quantity}</div>
+                    </div>`;
+                }
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
         } catch (err) {
             Toast.error(err.message);
         }

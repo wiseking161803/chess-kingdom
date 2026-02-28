@@ -119,8 +119,14 @@ function runBattle(atkTeam, defTeam) {
 
         for (const attacker of turnOrder) {
             if (attacker.hp <= 0) continue;
+            // Re-check opponents alive (someone may have died this turn)
             const opponents = (attacker.side === 'atk' ? defTeam : atkTeam).filter(c => c.hp > 0);
             if (opponents.length === 0) break;
+
+            // Check if battle is over
+            const atkStillAlive = atkTeam.filter(c => c.hp > 0).length;
+            const defStillAlive = defTeam.filter(c => c.hp > 0).length;
+            if (atkStillAlive === 0 || defStillAlive === 0) break;
 
             const frontAlive = opponents.filter(c => c.position === 'front');
             const targetPool = frontAlive.length > 0 ? frontAlive : opponents;
@@ -134,8 +140,10 @@ function runBattle(atkTeam, defTeam) {
 
             battleLog.push({
                 turn, side: attacker.side, damage: dmg, crit,
-                attacker: attacker.name, atkElement: attacker.element, atkSpd: attacker.spd,
-                target: target.name, defElement: target.element,
+                attacker: attacker.name, attackerId: attacker.id,
+                atkElement: attacker.element, atkSpd: attacker.spd,
+                target: target.name, targetId: target.id,
+                defElement: target.element,
                 elemBonus: em !== 1 ? Math.round((em - 1) * 100) : 0,
                 atkHp: attacker.hp, defHp: Math.max(0, target.hp)
             });
@@ -144,7 +152,8 @@ function runBattle(atkTeam, defTeam) {
 
     const atkAlive = atkTeam.filter(c => c.hp > 0).length;
     const defAlive = defTeam.filter(c => c.hp > 0).length;
-    const attackerWins = defAlive === 0 || atkAlive > defAlive;
+    // Attacker wins if defender wiped. Tie or timeout = defender wins (home advantage).
+    const attackerWins = defAlive === 0 ? true : (atkAlive === 0 ? false : atkAlive > defAlive);
 
     return { attackerWins, battleLog, atkAlive, defAlive };
 }
@@ -344,12 +353,12 @@ router.post('/challenge', authenticate, async (req, res) => {
             challenges_remaining: Math.max(0, 5 - (used + 1)),
             battle_log: battleLog,
             atk_team: atkTeam.map(c => ({
-                name: c.name, element: c.element, level: c.level,
+                id: c.id, name: c.name, element: c.element, level: c.level,
                 hp: Math.max(0, c.hp), maxHp: c.maxHp, startHp: c.startHp,
                 att: c.att, def: c.def, spd: c.spd, position: c.position
             })),
             def_team: defTeam.map(c => ({
-                name: c.name, element: c.element, level: c.level,
+                id: c.id, name: c.name, element: c.element, level: c.level,
                 hp: Math.max(0, c.hp), maxHp: c.maxHp, startHp: c.startHp,
                 att: c.att, def: c.def, spd: c.spd, position: c.position
             })),

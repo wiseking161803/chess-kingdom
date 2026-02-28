@@ -13,7 +13,7 @@ const App = {
         login: LoginPage,
         home: HomePage,
         puzzle: PuzzlePage,
-        mountain: MountainPage,
+        tower: TowerPage,
         school: SchoolPage,
         admin: AdminPage
     },

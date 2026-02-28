@@ -98,7 +98,7 @@ const AdminPage = {
                             <thead><tr><th>Tên</th><th>Username</th><th>Rank</th><th>⭐</th><th>🪙</th><th>ELO</th><th>Trạng Thái</th><th></th></tr></thead>
                             <tbody>${active.map(u => `
                                 <tr>
-                                    <td><strong>${u.display_name}</strong></td>
+                                    <td><strong style="cursor:pointer;color:var(--primary);text-decoration:underline;" onclick="AdminPage.showUserStats(${u.id})">${u.display_name}</strong></td>
                                     <td>${u.username}</td>
                                     <td class="text-small">${u.current_rank || '-'}</td>
                                     <td>${u.knowledge_stars || 0}</td>
@@ -116,6 +116,107 @@ const AdminPage = {
             `;
         } catch (err) {
             container.innerHTML = `<div class="text-center text-muted">Lỗi: ${err.message}</div>`;
+        }
+    },
+
+    async showUserStats(userId) {
+        try {
+            const data = await API.get(`/admin/users/${userId}/stats`);
+            const u = data.user;
+            const ss = data.sessionStats;
+            const totalMin = Math.floor(ss.total_time / 60);
+            const totalSec = ss.total_time % 60;
+            const totalAccuracy = (ss.total_solved + ss.total_failed) > 0
+                ? Math.round((ss.total_solved / (ss.total_solved + ss.total_failed)) * 100) : 0;
+
+            const setRows = (data.setProgress || []).filter(s => s.solved_count > 0).map(s => {
+                const pct = s.puzzle_count > 0 ? Math.round((s.solved_count / s.puzzle_count) * 100) : 0;
+                const setMin = Math.floor(s.set_time / 60);
+                const setSec = s.set_time % 60;
+                const modeLabel = s.solve_mode === 'focus' ? '🎯' : s.solve_mode === 'memory' ? '🧠' : '📋';
+                return `<tr>
+                    <td>${modeLabel} ${s.name}</td>
+                    <td>${s.solved_count}/${s.puzzle_count} (${pct}%)</td>
+                    <td>${setMin}:${String(setSec).padStart(2, '0')}</td>
+                </tr>`;
+            }).join('');
+
+            const sessionRows = (data.recentSessions || []).map(s => {
+                const d = new Date(s.created_at).toLocaleDateString('vi-VN');
+                const sm = Math.floor(s.total_time_seconds / 60);
+                const sss = s.total_time_seconds % 60;
+                const modeLabel = s.mode === 'focus' ? '🎯' : s.mode === 'memory' ? '🧠' : '📋';
+                return `<tr>
+                    <td class="text-small">${d}</td>
+                    <td>${modeLabel}</td>
+                    <td>${s.set_name || '-'}</td>
+                    <td>✅${s.puzzles_solved} ❌${s.puzzles_failed}</td>
+                    <td>${sm}:${String(sss).padStart(2, '0')}</td>
+                    <td style="color:${(s.elo_change || 0) >= 0 ? 'var(--success)' : 'var(--danger)'}">${(s.elo_change || 0) >= 0 ? '+' : ''}${s.elo_change || 0}</td>
+                </tr>`;
+            }).join('');
+
+            Modal.create({
+                id: 'user-stats-modal',
+                title: `📊 Thống Kê — ${u.display_name}`,
+                icon: '📊',
+                size: 'modal-lg',
+                content: `
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+                        <div style="text-align:center;padding:12px;background:var(--bg-secondary);border-radius:12px;">
+                            <div style="font-size:1.5rem;font-weight:700;">${totalMin}:${String(totalSec).padStart(2, '0')}</div>
+                            <div class="text-small text-muted">⏱️ Tổng thời gian</div>
+                        </div>
+                        <div style="text-align:center;padding:12px;background:var(--bg-secondary);border-radius:12px;">
+                            <div style="font-size:1.5rem;font-weight:700;">${ss.total_sessions}</div>
+                            <div class="text-small text-muted">📝 Phiên làm bài</div>
+                        </div>
+                        <div style="text-align:center;padding:12px;background:var(--bg-secondary);border-radius:12px;">
+                            <div style="font-size:1.5rem;font-weight:700;color:var(--success);">${ss.total_solved}</div>
+                            <div class="text-small text-muted">✅ Bài giải đúng</div>
+                        </div>
+                        <div style="text-align:center;padding:12px;background:var(--bg-secondary);border-radius:12px;">
+                            <div style="font-size:1.5rem;font-weight:700;">${totalAccuracy}%</div>
+                            <div class="text-small text-muted">🎯 Độ chính xác</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+                        <div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">
+                            <div style="font-weight:600;">🔥 ${u.current_streak || 0} ngày</div>
+                            <div class="text-small text-muted">Streak hiện tại</div>
+                        </div>
+                        <div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">
+                            <div style="font-weight:600;">🏆 ${u.longest_streak || 0} ngày</div>
+                            <div class="text-small text-muted">Streak dài nhất</div>
+                        </div>
+                        <div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">
+                            <div style="font-weight:600;">♟️ ${u.current_elo || 800}</div>
+                            <div class="text-small text-muted">ELO</div>
+                        </div>
+                    </div>
+
+                    ${setRows ? `
+                    <h4 style="margin-bottom:8px;">📚 Tiến độ các bộ puzzle</h4>
+                    <table class="admin-table" style="margin-bottom:20px;">
+                        <thead><tr><th>Bộ puzzle</th><th>Tiến độ</th><th>Thời gian</th></tr></thead>
+                        <tbody>${setRows}</tbody>
+                    </table>` : ''}
+
+                    ${sessionRows ? `
+                    <h4 style="margin-bottom:8px;">📋 10 phiên gần nhất</h4>
+                    <table class="admin-table">
+                        <thead><tr><th>Ngày</th><th>Mode</th><th>Set</th><th>Kết quả</th><th>Thời gian</th><th>Elo</th></tr></thead>
+                        <tbody>${sessionRows}</tbody>
+                    </table>` : ''}
+
+                    <div style="text-align:center;margin-top:16px;">
+                        <button class="btn btn-primary" onclick="Modal.hide('user-stats-modal')">✅ Đóng</button>
+                    </div>
+                `
+            });
+            Modal.show('user-stats-modal');
+        } catch (err) {
+            Toast.error('Lỗi lấy thống kê: ' + err.message);
         }
     },
 
@@ -183,115 +284,344 @@ const AdminPage = {
     },
 
     // ============ PUZZLES ============
+    _puzzleGroupFilter: '',
+    _puzzleSearch: '',
+
     async loadPuzzles(container) {
         try {
             const data = await API.get('/puzzles/sets');
+            let groups = [];
+            try { const gData = await API.get('/puzzles/groups'); groups = gData.groups || []; } catch (e) { }
+
+            const sets = data.puzzle_sets;
+
+            // Filter
+            let filtered = sets;
+            if (this._puzzleGroupFilter) {
+                if (this._puzzleGroupFilter === '__none__') {
+                    filtered = filtered.filter(s => !s.group_name);
+                } else {
+                    filtered = filtered.filter(s => s.group_name === this._puzzleGroupFilter);
+                }
+            }
+            if (this._puzzleSearch) {
+                const q = this._puzzleSearch.toLowerCase();
+                filtered = filtered.filter(s => s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q));
+            }
+
+            // Group sets
+            const grouped = {};
+            filtered.forEach(s => {
+                const g = s.group_name || '__none__';
+                if (!grouped[g]) grouped[g] = [];
+                grouped[g].push(s);
+            });
+
+            const modeLabels = { basic: '📋 Cơ Bản', focus: '🎯 Tập Trung', memory: '🧠 Trí Nhớ', opening: '📖 Khai Cuộc' };
+            const playLabels = { first: '🏁 Đi trước', second: '⏳ Đi sau' };
+
+            const renderCard = (s) => {
+                return `
+                    <div class="shop-card" style="position:relative;">
+                        <div class="shop-card-icon">♟️</div>
+                        <div class="shop-card-body">
+                            <div class="shop-card-name">
+                                <span style="background:var(--primary);color:#fff;padding:1px 6px;border-radius:6px;font-size:0.7rem;margin-right:6px;">ID: ${s.id}</span>${s.name}
+                            </div>
+                            <div class="text-small text-muted">${s.puzzle_count} bài • ${s.difficulty}</div>
+                            <div class="text-xs" style="margin-top:4px;color:var(--primary);">${playLabels[s.play_mode] || '🏁 Đi trước'} • ${modeLabels[s.solve_mode] || '📋 Cơ Bản'}</div>
+                            ${s.group_name ? `<div class="text-xs mt-1"><span style="background:rgba(108,92,231,0.15);padding:2px 8px;border-radius:10px;font-weight:600;">📁 ${s.group_name}</span></div>` : ''}
+                            <div class="text-xs text-muted mt-1">${new Date(s.created_at).toLocaleDateString('vi-VN')}</div>
+                            <div style="display:flex;gap:6px;margin-top:8px;">
+                                <button class="btn btn-outline btn-sm" onclick="AdminPage.showEditPuzzleSet(${s.id})">✏️ Sửa</button>
+                                <button class="btn btn-danger btn-sm" onclick="AdminPage.deletePuzzleSet(${s.id})">🗑️</button>
+                            </div>
+                        </div>
+                    </div>`;
+            };
+
+            const groupSections = Object.entries(grouped).map(([gName, gSets]) => {
+                const label = gName === '__none__' ? '📦 Chưa phân nhóm' : `📁 ${gName}`;
+                return `
+                    <div class="admin-group-section" style="margin-bottom:16px;">
+                        <div class="admin-group-header">
+                            <span>${label}</span>
+                            <span class="admin-group-count">${gSets.length} bộ</span>
+                        </div>
+                        <div class="shop-grid" style="padding:12px;">${gSets.map(renderCard).join('')}</div>
+                    </div>`;
+            }).join('');
 
             container.innerHTML = `
                 <div class="flex gap-2 mb-3" style="justify-content:space-between;align-items:center;flex-wrap:wrap;">
-                    <h3>♟️ Quản Lý Bài Tập</h3>
-                    <button class="btn btn-primary btn-sm" onclick="AdminPage.showUploadPGN()">📂 Upload PGN</button>
+                    <h3>♟️ Quản Lý Bài Tập (${sets.length})</h3>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-outline btn-sm" onclick="AdminPage.showCreateGroup()">📁 Tạo Nhóm</button>
+                        <button class="btn btn-primary btn-sm" onclick="AdminPage.showUploadPGN()">📂 Upload PGN</button>
+                    </div>
                 </div>
-                <div class="shop-grid">
-                    ${data.puzzle_sets.map(s => {
-                const modeLabel = s.play_mode === 'second' ? '⏳ Đi sau' : '🏁 Đi trước';
-                const solveModeLabels = { basic: '📋 Cơ Bản', focus: '🎯 Tập Trung', memory: '🧠 Trí Nhớ', opening: '📖 Khai Cuộc' };
-                const solveLabel = solveModeLabels[s.solve_mode] || '📋 Cơ Bản';
-                return `
-                        <div class="shop-card">
-                            <div class="shop-card-icon">♟️</div>
-                            <div class="shop-card-body">
-                                <div class="shop-card-name"><span style="background:var(--primary);color:#fff;padding:1px 6px;border-radius:6px;font-size:0.7rem;margin-right:6px;">ID: ${s.id}</span>${s.name}</div>
-                                <div class="text-small text-muted">${s.puzzle_count} bài • ${s.difficulty}</div>
-                                <div class="text-xs" style="margin-top:4px;color:var(--primary);">${modeLabel} • ${solveLabel}</div>
-                                <div class="text-xs text-muted mt-1">${new Date(s.created_at).toLocaleDateString('vi-VN')}</div>
-                                <button class="btn btn-danger btn-sm mt-1" onclick="AdminPage.deletePuzzleSet(${s.id})">🗑️ Xóa</button>
-                            </div>
-                        </div>
-                    `}).join('')}
-                    ${data.puzzle_sets.length === 0 ? '<div class="empty-state" style="grid-column:1/-1;"><div class="empty-state-icon">📦</div><div class="empty-state-text">Chưa có bộ puzzle nào</div></div>' : ''}
+                <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                    <select class="form-select" style="max-width:200px;" onchange="AdminPage._puzzleGroupFilter=this.value;AdminPage.loadPuzzles(document.getElementById('admin-content'))">
+                        <option value="">Tất cả nhóm</option>
+                        ${groups.map(g => `<option value="${g}" ${this._puzzleGroupFilter === g ? 'selected' : ''}>📁 ${g}</option>`).join('')}
+                        <option value="__none__" ${this._puzzleGroupFilter === '__none__' ? 'selected' : ''}>📦 Chưa phân nhóm</option>
+                    </select>
+                    <input type="text" class="form-input" style="max-width:250px;" placeholder="🔍 Tìm kiếm..." value="${this._puzzleSearch}" 
+                        onkeyup="AdminPage._puzzleSearch=this.value;clearTimeout(AdminPage._searchTimer);AdminPage._searchTimer=setTimeout(()=>AdminPage.loadPuzzles(document.getElementById('admin-content')),300)">
                 </div>
+                ${groupSections || '<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">Chưa có bộ puzzle nào</div></div>'}
             `;
         } catch (err) {
             container.innerHTML = `<div class="text-center text-muted">Lỗi: ${err.message}</div>`;
         }
     },
 
-    showUploadPGN() {
+    showCreateGroup() {
         Modal.create({
-            id: 'upload-pgn-modal',
-            title: 'Upload Bộ Puzzle PGN',
-            icon: '📂',
+            id: 'create-group-modal',
+            title: 'Tạo Nhóm Puzzle',
+            icon: '📁',
             content: `
-                <form id="upload-pgn-form">
+                <form id="create-group-form">
                     <div class="form-group">
-                        <label class="form-label">Tên bộ puzzle</label>
-                        <input type="text" class="form-input" id="pgn-name" placeholder="VD: Bài tập chiến thuật cơ bản" required>
+                        <label class="form-label">Tên nhóm</label>
+                        <input type="text" class="form-input" id="group-name" required placeholder="VD: Chiến thuật cơ bản, Tàn cuộc, Khai cuộc...">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Mô tả</label>
-                        <input type="text" class="form-input" id="pgn-desc" placeholder="Mô tả ngắn...">
+                        <label class="form-label">Gán cho các puzzle (chọn nhiều)</label>
+                        <div id="group-puzzle-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;">
+                            Đang tải...
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Độ khó</label>
-                        <select class="form-select" id="pgn-difficulty">
-                            <option value="beginner">Người mới</option>
-                            <option value="intermediate">Trung bình</option>
-                            <option value="advanced">Nâng cao</option>
-                            <option value="expert">Chuyên gia</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">♟️ Chế độ chơi</label>
-                        <select class="form-select" id="pgn-play-mode">
-                            <option value="first">🏁 Người chơi đi trước (mặc định)</option>
-                            <option value="second">⏳ Người chơi đi sau (đối thủ đi nước 1)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">🎮 Chế độ giải</label>
-                        <select class="form-select" id="pgn-solve-mode">
-                            <option value="basic">📋 Cơ Bản — Giải bình thường</option>
-                            <option value="focus">🎯 Tập Trung — Không gợi ý</option>
-                            <option value="memory">🧠 Trí Nhớ — Ẩn quân sau vài giây</option>
-                            <option value="opening">📖 Khai Cuộc — Luyện khai cuộc</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">File PGN</label>
-                        <input type="file" class="form-input" id="pgn-file" accept=".pgn" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width:100%;">📤 Upload & Tạo</button>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">✅ Tạo & Gán</button>
                 </form>
             `
         });
-        Modal.show('upload-pgn-modal');
+        Modal.show('create-group-modal');
 
-        document.getElementById('upload-pgn-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
-            btn.disabled = true;
-            btn.textContent = '⏳ Đang xử lý...';
-
+        // Load puzzle list for selection
+        (async () => {
             try {
-                const formData = new FormData();
-                formData.append('name', document.getElementById('pgn-name').value);
-                formData.append('description', document.getElementById('pgn-desc').value);
-                formData.append('difficulty', document.getElementById('pgn-difficulty').value);
-                formData.append('play_mode', document.getElementById('pgn-play-mode').value);
-                formData.append('solve_mode', document.getElementById('pgn-solve-mode').value);
-                formData.append('pgn_file', document.getElementById('pgn-file').files[0]);
+                const data = await API.get('/puzzles/sets');
+                const listEl = document.getElementById('group-puzzle-list');
+                if (listEl) {
+                    listEl.innerHTML = data.puzzle_sets.map(s => `
+                        <label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;">
+                            <input type="checkbox" value="${s.id}" class="group-puzzle-cb">
+                            <span><strong>ID ${s.id}</strong> — ${s.name} ${s.group_name ? `(📁 ${s.group_name})` : ''}</span>
+                        </label>
+                    `).join('');
+                }
+            } catch (e) { }
+        })();
 
-                const result = await API.upload('/puzzles/sets', formData);
-                Toast.success(result.message);
-                Modal.hide('upload-pgn-modal');
+        document.getElementById('create-group-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const groupName = document.getElementById('group-name').value.trim();
+            if (!groupName) return;
+
+            const checked = [...document.querySelectorAll('.group-puzzle-cb:checked')].map(cb => cb.value);
+            try {
+                for (const id of checked) {
+                    await API.put(`/puzzles/sets/${id}`, { group_name: groupName });
+                }
+                Toast.success(`Đã tạo nhóm "${groupName}" và gán ${checked.length} bộ puzzle!`);
+                Modal.hide('create-group-modal');
                 this.switchTab('puzzles');
             } catch (err) {
                 Toast.error(err.message);
-                btn.disabled = false;
-                btn.textContent = '📤 Upload & Tạo';
             }
         });
+    },
+
+    async showEditPuzzleSet(setId) {
+        try {
+            const data = await API.get('/puzzles/sets');
+            const s = data.puzzle_sets.find(p => p.id === setId);
+            if (!s) return Toast.error('Không tìm thấy!');
+
+            let groups = [];
+            try { const gData = await API.get('/puzzles/groups'); groups = gData.groups || []; } catch (e) { }
+
+            Modal.create({
+                id: 'edit-puzzle-modal',
+                title: `✏️ Sửa Puzzle #${s.id}`,
+                icon: '♟️',
+                content: `
+                    <form id="edit-puzzle-form">
+                        <div class="form-group">
+                            <label class="form-label">Tên</label>
+                            <input type="text" class="form-input" id="ep-name" value="${s.name}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mô tả</label>
+                            <input type="text" class="form-input" id="ep-desc" value="${s.description || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Nhóm</label>
+                            <div style="display:flex;gap:8px;">
+                                <select class="form-select" id="ep-group" style="flex:1;">
+                                    <option value="">-- Không nhóm --</option>
+                                    ${groups.map(g => `<option value="${g}" ${s.group_name === g ? 'selected' : ''}>${g}</option>`).join('')}
+                                </select>
+                                <input type="text" class="form-input" id="ep-group-new" placeholder="Hoặc nhóm mới..." style="flex:1;">
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">Độ khó</label>
+                                <select class="form-select" id="ep-diff">
+                                    <option value="beginner" ${s.difficulty === 'beginner' ? 'selected' : ''}>Người mới</option>
+                                    <option value="intermediate" ${s.difficulty === 'intermediate' ? 'selected' : ''}>Trung bình</option>
+                                    <option value="advanced" ${s.difficulty === 'advanced' ? 'selected' : ''}>Nâng cao</option>
+                                    <option value="expert" ${s.difficulty === 'expert' ? 'selected' : ''}>Chuyên gia</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">Chế độ chơi</label>
+                                <select class="form-select" id="ep-play">
+                                    <option value="first" ${s.play_mode === 'first' ? 'selected' : ''}>🏁 Đi trước</option>
+                                    <option value="second" ${s.play_mode === 'second' ? 'selected' : ''}>⏳ Đi sau</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label class="form-label">Chế độ giải</label>
+                                <select class="form-select" id="ep-solve">
+                                    <option value="basic" ${s.solve_mode === 'basic' ? 'selected' : ''}>📋 Cơ Bản</option>
+                                    <option value="focus" ${s.solve_mode === 'focus' ? 'selected' : ''}>🎯 Tập Trung</option>
+                                    <option value="memory" ${s.solve_mode === 'memory' ? 'selected' : ''}>🧠 Trí Nhớ</option>
+                                    <option value="opening" ${s.solve_mode === 'opening' ? 'selected' : ''}>📖 Khai Cuộc</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;">💾 Lưu</button>
+                    </form>
+                `
+            });
+            Modal.show('edit-puzzle-modal');
+
+            document.getElementById('edit-puzzle-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newGroup = document.getElementById('ep-group-new').value.trim();
+                const groupVal = newGroup || document.getElementById('ep-group').value || '';
+                try {
+                    await API.put(`/puzzles/sets/${setId}`, {
+                        name: document.getElementById('ep-name').value,
+                        description: document.getElementById('ep-desc').value,
+                        difficulty: document.getElementById('ep-diff').value,
+                        play_mode: document.getElementById('ep-play').value,
+                        solve_mode: document.getElementById('ep-solve').value,
+                        group_name: groupVal
+                    });
+                    Toast.success('Đã cập nhật!');
+                    Modal.hide('edit-puzzle-modal');
+                    this.switchTab('puzzles');
+                } catch (err) {
+                    Toast.error(err.message);
+                }
+            });
+        } catch (err) {
+            Toast.error(err.message);
+        }
+    },
+
+    showUploadPGN() {
+        // Fetch existing groups for the group dropdown
+        (async () => {
+            let groups = [];
+            try { const gData = await API.get('/puzzles/groups'); groups = gData.groups || []; } catch (e) { }
+
+            Modal.create({
+                id: 'upload-pgn-modal',
+                title: 'Upload Bộ Puzzle PGN',
+                icon: '📂',
+                content: `
+                    <form id="upload-pgn-form">
+                        <div class="form-group">
+                            <label class="form-label">Tên bộ puzzle</label>
+                            <input type="text" class="form-input" id="pgn-name" placeholder="VD: Bài tập chiến thuật cơ bản" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mô tả</label>
+                            <input type="text" class="form-input" id="pgn-desc" placeholder="Mô tả ngắn...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">📁 Nhóm</label>
+                            <div style="display:flex;gap:8px;">
+                                <select class="form-select" id="pgn-group" style="flex:1;">
+                                    <option value="">-- Không nhóm --</option>
+                                    ${groups.map(g => `<option value="${g}">${g}</option>`).join('')}
+                                </select>
+                                <input type="text" class="form-input" id="pgn-group-new" placeholder="Hoặc nhóm mới..." style="flex:1;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Độ khó</label>
+                            <select class="form-select" id="pgn-difficulty">
+                                <option value="beginner">Người mới</option>
+                                <option value="intermediate">Trung bình</option>
+                                <option value="advanced">Nâng cao</option>
+                                <option value="expert">Chuyên gia</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">♟️ Chế độ chơi</label>
+                            <select class="form-select" id="pgn-play-mode">
+                                <option value="first">🏁 Người chơi đi trước (mặc định)</option>
+                                <option value="second">⏳ Người chơi đi sau (đối thủ đi nước 1)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">🎮 Chế độ giải</label>
+                            <select class="form-select" id="pgn-solve-mode">
+                                <option value="basic">📋 Cơ Bản — Giải bình thường</option>
+                                <option value="focus">🎯 Tập Trung — Không gợi ý</option>
+                                <option value="memory">🧠 Trí Nhớ — Ẩn quân sau vài giây</option>
+                                <option value="opening">📖 Khai Cuộc — Luyện khai cuộc</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">File PGN</label>
+                            <input type="file" class="form-input" id="pgn-file" accept=".pgn" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;">📤 Upload & Tạo</button>
+                    </form>
+                `
+            });
+            Modal.show('upload-pgn-modal');
+
+            document.getElementById('upload-pgn-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = e.target.querySelector('button[type="submit"]');
+                btn.disabled = true;
+                btn.textContent = '⏳ Đang xử lý...';
+
+                try {
+                    const newGroup = document.getElementById('pgn-group-new').value.trim();
+                    const groupVal = newGroup || document.getElementById('pgn-group').value || '';
+
+                    const formData = new FormData();
+                    formData.append('name', document.getElementById('pgn-name').value);
+                    formData.append('description', document.getElementById('pgn-desc').value);
+                    formData.append('difficulty', document.getElementById('pgn-difficulty').value);
+                    formData.append('play_mode', document.getElementById('pgn-play-mode').value);
+                    formData.append('solve_mode', document.getElementById('pgn-solve-mode').value);
+                    formData.append('group_name', groupVal);
+                    formData.append('pgn_file', document.getElementById('pgn-file').files[0]);
+
+                    const result = await API.upload('/puzzles/sets', formData);
+                    Toast.success(result.message);
+                    Modal.hide('upload-pgn-modal');
+                    this.switchTab('puzzles');
+                } catch (err) {
+                    Toast.error(err.message);
+                    btn.disabled = false;
+                    btn.textContent = '📤 Upload & Tạo';
+                }
+            });
+        })();
     },
 
     async deletePuzzleSet(setId) {

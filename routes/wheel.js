@@ -13,13 +13,13 @@ router.get('/config', authenticate, async (req, res) => {
             'SELECT id, label, prize_type, rarity, color FROM lucky_wheel_prizes WHERE is_active = 1 ORDER BY sort_order'
         );
 
-        // Calculate free spins: 1 per 1000 total stars earned
+        // Calculate free spins: 1 per 100 total stars earned
         const [currencies] = await db.query(
             'SELECT total_stars_earned FROM user_currencies WHERE user_id = ?',
             [req.user.id]
         );
         const totalStars = currencies[0]?.total_stars_earned || 0;
-        const totalFreeSpins = Math.floor(totalStars / 1000);
+        const totalFreeSpins = Math.floor(totalStars / 100);
 
         // Count used spins
         const [spins] = await db.query(
@@ -53,7 +53,7 @@ router.post('/spin', authenticate, async (req, res) => {
             [userId]
         );
         const totalStars = currencies[0]?.total_stars_earned || 0;
-        const totalFreeSpins = Math.floor(totalStars / 1000);
+        const totalFreeSpins = Math.floor(totalStars / 100);
 
         const [spins] = await db.query(
             'SELECT COUNT(*) as count FROM lucky_wheel_history WHERE user_id = ?',
@@ -110,6 +110,17 @@ router.post('/spin', authenticate, async (req, res) => {
             await db.query(
                 'UPDATE user_currencies SET knowledge_stars = knowledge_stars + ? WHERE user_id = ?',
                 [amount, userId]
+            );
+        } else if (selected.prize_type === 'tickets') {
+            const amount = parseInt(selected.prize_value);
+            await db.query(
+                'UPDATE user_currencies SET gacha_tickets = gacha_tickets + ? WHERE user_id = ?',
+                [amount, userId]
+            );
+        } else if (selected.prize_type === 'egg') {
+            await db.query(
+                'INSERT INTO dragon_eggs (user_id, name, hatch_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))',
+                [userId, 'Trứng Thần (Vòng Quay)']
             );
         }
 

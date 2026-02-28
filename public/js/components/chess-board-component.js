@@ -11,6 +11,19 @@
  */
 const ChessBoardComponent = {
     // ═════════════════════════════════════════
+    // BOARD SKINS — Color psychology optimized
+    // ═════════════════════════════════════════
+    BOARD_SKINS: {
+        memory: { name: '🧠 Trí nhớ', desc: 'Tông nóng hỗ trợ nhận dạng mẫu', light: '#f0d9b5', dark: '#b58863', bg: '#2c1f14' },
+        focus: { name: '🎯 Tập trung', desc: 'Tông lạnh giảm mỏi mắt', light: '#dee3e6', dark: '#6b8cae', bg: '#1a2332' },
+        speed: { name: '⚡ Tốc độ', desc: 'Tương phản cao, quét nhanh', light: '#eeeed2', dark: '#769656', bg: '#302e2b' }
+    },
+    currentSkin: null,
+
+    // Piece image preload cache
+    _pieceImagesLoaded: false,
+
+    // ═════════════════════════════════════════
     // STATE
     // ═════════════════════════════════════════
     board: null,
@@ -41,13 +54,22 @@ const ChessBoardComponent = {
     sessionStartTime: null,
 
     // Memory mode state
-    memoryPhase: 'none', // 'memorize' | 'hidden' | 'none'
+    memoryPhase: 'none',
     memoryTimer: null,
     memoryMistakes: 0,
 
     // Click-to-move state
     selectedSquare: null,
     legalMoves: [],
+
+    // Variation state (Basic mode only)
+    _variationStack: [],
+    _isInVariation: false,
+    _isAutoPlaying: false,
+    _variationsDone: false,
+
+    // Retry logic: track mistakes
+    _madeWrongMove: false,
 
     // Audio context
     audioCtx: null,
@@ -65,62 +87,119 @@ const ChessBoardComponent = {
     playSound(type) {
         try {
             const ctx = this._getAudioCtx();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
+            if (ctx.state === 'suspended') ctx.resume();
+            const t = ctx.currentTime;
 
             switch (type) {
-                case 'move':
+                case 'move': {
+                    // Soft wooden "tok" - sine sweep + filtered noise
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
                     osc.type = 'sine';
-                    osc.frequency.setValueAtTime(600, ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.08);
-                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-                    osc.start(ctx.currentTime);
-                    osc.stop(ctx.currentTime + 0.1);
+                    osc.frequency.setValueAtTime(420, t);
+                    osc.frequency.exponentialRampToValueAtTime(280, t + 0.08);
+                    gain.gain.setValueAtTime(0.15, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                    osc.start(t); osc.stop(t + 0.1);
+                    // Noise burst
+                    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
+                    const data = buf.getChannelData(0);
+                    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+                    const noise = ctx.createBufferSource();
+                    const nGain = ctx.createGain();
+                    noise.buffer = buf;
+                    noise.connect(nGain); nGain.connect(ctx.destination);
+                    nGain.gain.setValueAtTime(0.08, t);
+                    nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+                    noise.start(t); noise.stop(t + 0.05);
                     break;
-                case 'capture':
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(300, ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.15);
-                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
-                    osc.start(ctx.currentTime);
-                    osc.stop(ctx.currentTime + 0.18);
-                    break;
-                case 'correct':
+                }
+                case 'capture': {
+                    // Deep resonant thud
+                    const osc = ctx.createOscillator();
+                    const osc2 = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    const gain2 = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc2.connect(gain2); gain2.connect(ctx.destination);
                     osc.type = 'sine';
-                    osc.frequency.setValueAtTime(523, ctx.currentTime);
-                    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
-                    osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2);
-                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-                    osc.start(ctx.currentTime);
-                    osc.stop(ctx.currentTime + 0.35);
+                    osc.frequency.setValueAtTime(300, t);
+                    osc.frequency.exponentialRampToValueAtTime(120, t + 0.15);
+                    gain.gain.setValueAtTime(0.2, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(600, t);
+                    osc2.frequency.exponentialRampToValueAtTime(240, t + 0.1);
+                    gain2.gain.setValueAtTime(0.08, t);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+                    osc.start(t); osc.stop(t + 0.2);
+                    osc2.start(t); osc2.stop(t + 0.12);
                     break;
-                case 'wrong':
-                    osc.type = 'square';
-                    osc.frequency.setValueAtTime(200, ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
-                    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
-                    osc.start(ctx.currentTime);
-                    osc.stop(ctx.currentTime + 0.25);
+                }
+                case 'correct': {
+                    // Ascending pentatonic bell chime: C5→E5→G5→C6
+                    [523, 659, 784, 1047].forEach((freq, i) => {
+                        const o = ctx.createOscillator();
+                        const o2 = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.connect(g); o2.connect(g); g.connect(ctx.destination);
+                        o.type = 'sine'; o.frequency.value = freq;
+                        o2.type = 'sine'; o2.frequency.value = freq * 1.003; // slight detune
+                        g.gain.setValueAtTime(0.12, t + i * 0.1);
+                        g.gain.exponentialRampToValueAtTime(0.01, t + i * 0.1 + 0.25);
+                        o.start(t + i * 0.1); o.stop(t + i * 0.1 + 0.25);
+                        o2.start(t + i * 0.1); o2.stop(t + i * 0.1 + 0.25);
+                    });
+                    return;
+                }
+                case 'wrong': {
+                    // Gentle descending tone
+                    const o1 = ctx.createOscillator();
+                    const g1 = ctx.createGain();
+                    o1.connect(g1); g1.connect(ctx.destination);
+                    o1.type = 'sine';
+                    o1.frequency.setValueAtTime(440, t);
+                    o1.frequency.exponentialRampToValueAtTime(349, t + 0.15);
+                    g1.gain.setValueAtTime(0.12, t);
+                    g1.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                    o1.start(t); o1.stop(t + 0.2);
+                    const o2 = ctx.createOscillator();
+                    const g2 = ctx.createGain();
+                    o2.connect(g2); g2.connect(ctx.destination);
+                    o2.type = 'sine';
+                    o2.frequency.setValueAtTime(370, t + 0.15);
+                    o2.frequency.exponentialRampToValueAtTime(293, t + 0.3);
+                    g2.gain.setValueAtTime(0.1, t + 0.15);
+                    g2.gain.exponentialRampToValueAtTime(0.01, t + 0.35);
+                    o2.start(t + 0.15); o2.stop(t + 0.35);
                     break;
-                case 'solved':
+                }
+                case 'solved': {
                     [523, 659, 784, 1047].forEach((freq, i) => {
                         const o = ctx.createOscillator();
                         const g = ctx.createGain();
                         o.connect(g); g.connect(ctx.destination);
-                        o.type = 'sine';
-                        o.frequency.value = freq;
-                        g.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.12);
-                        g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.12 + 0.2);
-                        o.start(ctx.currentTime + i * 0.12);
-                        o.stop(ctx.currentTime + i * 0.12 + 0.2);
+                        o.type = 'sine'; o.frequency.value = freq;
+                        g.gain.setValueAtTime(0.12, t + i * 0.12);
+                        g.gain.exponentialRampToValueAtTime(0.01, t + i * 0.12 + 0.2);
+                        o.start(t + i * 0.12); o.stop(t + i * 0.12 + 0.2);
                     });
-                    return; // Multiple oscillators, don't use the default one
+                    return;
+                }
+                case 'variation_enter': {
+                    // Quick ascending ding
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.connect(g); g.connect(ctx.destination);
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(600, t);
+                    o.frequency.exponentialRampToValueAtTime(900, t + 0.1);
+                    g.gain.setValueAtTime(0.1, t);
+                    g.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+                    o.start(t); o.stop(t + 0.15);
+                    break;
+                }
             }
         } catch (e) { /* Audio not supported */ }
     },
@@ -139,6 +218,74 @@ const ChessBoardComponent = {
             // Loss: full penalty
             return Math.round(K * (0 - expected));
         }
+    },
+
+    // ═════════════════════════════════════════
+    // BOARD SKINS
+    // ═════════════════════════════════════════
+    applySkin(skinKey) {
+        const skin = this.BOARD_SKINS[skinKey];
+        if (!skin) return;
+        this.currentSkin = skinKey;
+        localStorage.setItem('chess_board_skin', skinKey);
+        // Apply colors via CSS custom properties on board wrapper
+        const wrapper = document.querySelector('.cbc-wrapper');
+        if (wrapper) {
+            wrapper.style.setProperty('--board-light', skin.light);
+            wrapper.style.setProperty('--board-dark', skin.dark);
+            wrapper.style.setProperty('--board-bg', skin.bg);
+        }
+        // Override chessboardjs square colors
+        document.querySelectorAll('#cbc-board .white-1e1d7').forEach(el => el.style.backgroundColor = skin.light);
+        document.querySelectorAll('#cbc-board .black-3c85d').forEach(el => el.style.backgroundColor = skin.dark);
+    },
+
+    _applyCurrentSkin() {
+        // Auto-select skin based on mode, or use saved preference
+        const saved = localStorage.getItem('chess_board_skin');
+        const modeDefaults = { memory: 'memory', focus: 'focus', basic: 'speed' };
+        const skinKey = saved || modeDefaults[this.mode] || 'speed';
+        this.applySkin(skinKey);
+    },
+
+    showSkinSelector() {
+        const items = Object.entries(this.BOARD_SKINS).map(([key, skin]) => {
+            const isActive = this.currentSkin === key;
+            return `
+            <div class="cbc-skin-option ${isActive ? 'active' : ''}" onclick="ChessBoardComponent.applySkin('${key}'); ChessBoardComponent.showSkinSelector();">
+                <div class="cbc-skin-preview">
+                    <div class="cbc-skin-mini" style="display:grid;grid-template-columns:1fr 1fr;width:40px;height:40px;border-radius:4px;overflow:hidden;">
+                        <div style="background:${skin.light}"></div>
+                        <div style="background:${skin.dark}"></div>
+                        <div style="background:${skin.dark}"></div>
+                        <div style="background:${skin.light}"></div>
+                    </div>
+                </div>
+                <div>
+                    <div style="font-weight:600;">${skin.name}</div>
+                    <div class="text-small text-muted">${skin.desc}</div>
+                </div>
+            </div>`;
+        }).join('');
+
+        Modal.create({
+            id: 'cbc-skin-modal',
+            title: '🎨 Giao Diện Bàn Cờ',
+            icon: '🎨',
+            content: `<div class="cbc-skin-list">${items}</div>
+                <button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px;" onclick="Modal.hide('cbc-skin-modal')">✅ Đóng</button>`
+        });
+        Modal.show('cbc-skin-modal');
+    },
+
+    _preloadPieceImages() {
+        if (this._pieceImagesLoaded) return;
+        const pieces = ['wK', 'wQ', 'wR', 'wB', 'wN', 'wP', 'bK', 'bQ', 'bR', 'bB', 'bN', 'bP'];
+        pieces.forEach(p => {
+            const img = new Image();
+            img.src = `https://chessboardjs.com/img/chesspieces/wikipedia/${p}.png`;
+        });
+        this._pieceImagesLoaded = true;
     },
 
     // ═════════════════════════════════════════
@@ -170,19 +317,37 @@ const ChessBoardComponent = {
         this.selectedSquare = null;
         this.legalMoves = [];
 
-        // Find first unsolved puzzle
-        this.currentPuzzleIdx = 0;
-        if (this.pgnSource?.puzzles) {
-            for (let i = 0; i < this.pgnSource.puzzles.length; i++) {
-                if (!this.pgnSource.puzzles[i].user_progress?.solved) {
-                    this.currentPuzzleIdx = i;
-                    break;
+        // Reset variation state
+        this._variationStack = [];
+        this._isInVariation = false;
+        this._isAutoPlaying = false;
+        this._variationsDone = false;
+        this._madeWrongMove = false;
+
+        // Preload piece images
+        this._preloadPieceImages();
+
+        // Focus mode: ALWAYS start from puzzle 1
+        if (this.mode === 'focus') {
+            this.currentPuzzleIdx = 0;
+        } else {
+            // Find first unsolved puzzle
+            this.currentPuzzleIdx = 0;
+            if (this.pgnSource?.puzzles) {
+                for (let i = 0; i < this.pgnSource.puzzles.length; i++) {
+                    if (!this.pgnSource.puzzles[i].user_progress?.solved) {
+                        this.currentPuzzleIdx = i;
+                        break;
+                    }
                 }
             }
         }
 
         this.render();
-        this.loadPuzzle();
+        this._showStartScreen();
+
+        // Apply skin after board is rendered
+        setTimeout(() => this._applyCurrentSkin(), 100);
 
         // Fix: mark parent modal as containing chessboard for overflow fix
         const container = document.getElementById(this.containerEl);
@@ -246,9 +411,10 @@ const ChessBoardComponent = {
                             <div class="cbc-meta">
                                 <div class="text-small text-muted">Gợi ý: <span id="cbc-hints">0</span></div>
                             </div>
+                            <div id="cbc-comment" class="cbc-comment hidden"></div>
                             <div class="cbc-actions">
                                 ${this.mode !== 'memory' ? `<button class="btn btn-accent btn-sm" onclick="ChessBoardComponent.getHint()">💡 Gợi Ý</button>` : ''}
-                                <button class="btn btn-primary btn-sm" onclick="ChessBoardComponent.nextPuzzle()">➡️ Tiếp</button>
+                                <button class="btn btn-outline btn-sm" onclick="ChessBoardComponent.showSkinSelector()">🎨</button>
                             </div>
                         </div>
                     </div>
@@ -257,8 +423,73 @@ const ChessBoardComponent = {
         </div>
         `;
 
-        // Start session timer
+        // Timer started when user clicks Start
+    },
+
+    /**
+     * Show Start screen overlay before puzzle begins
+     */
+    _showStartScreen() {
+        const modeDescriptions = {
+            basic: '📋 Giải puzzle bình thường. Tính thời gian và độ chính xác.',
+            focus: '🔥 <strong>Sai 1 nước = Kết thúc ngay!</strong> Khi thử lại phải bắt đầu từ bài đầu tiên.',
+            memory: '🧠 Xem thế cờ <strong>8 giây</strong> → Quân cờ ẩn → Nước đi máy hiện <strong>mũi tên</strong>. Sai 3 lần thì dừng.',
+            opening: '📖 Luyện tập các khai cuộc phổ biến.'
+        };
+        const modeLabels = { basic: '📋 Cơ Bản', focus: '🎯 Tập Trung', memory: '🧠 Trí Nhớ', opening: '📖 Khai Cuộc' };
+        const modeColors = { basic: 'var(--primary)', focus: '#E74C3C', memory: '#8E44AD', opening: '#27AE60' };
+        const totalPuzzles = this.pgnSource?.puzzles?.length || 0;
+        const setName = this.pgnSource?.puzzle_set?.name || 'Bộ puzzle';
+
+        const container = document.getElementById(this.containerEl);
+        if (!container) return;
+
+        // Show start overlay inside the cbc-wrapper
+        const wrapper = container.querySelector('.cbc-wrapper');
+        if (!wrapper) return;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'cbc-start-overlay';
+        overlay.style.cssText = `
+            position:absolute;top:0;left:0;right:0;bottom:0;z-index:200;
+            background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);
+            display:flex;align-items:center;justify-content:center;
+            border-radius:16px;
+        `;
+        overlay.innerHTML = `
+            <div style="text-align:center;color:#fff;padding:32px;max-width:400px;">
+                <div style="font-size:3rem;margin-bottom:12px;">${this.mode === 'focus' ? '🎯' : this.mode === 'memory' ? '🧠' : '♟️'}</div>
+                <div style="font-size:1.4rem;font-weight:700;margin-bottom:8px;">${setName}</div>
+                <div style="font-size:0.95rem;margin-bottom:12px;color:rgba(255,255,255,0.8);">${totalPuzzles} bài tập</div>
+                <div style="
+                    background:${modeColors[this.mode]};padding:8px 16px;border-radius:20px;
+                    display:inline-block;font-weight:600;font-size:0.9rem;margin-bottom:16px;
+                ">${modeLabels[this.mode]}</div>
+                <div style="font-size:0.85rem;color:rgba(255,255,255,0.85);margin-bottom:24px;line-height:1.5;">
+                    ${modeDescriptions[this.mode] || ''}
+                </div>
+                <button onclick="ChessBoardComponent._startFromOverlay()" style="
+                    background:linear-gradient(135deg, ${modeColors[this.mode]}, #6C5CE7);color:#fff;
+                    border:none;padding:14px 48px;border-radius:12px;font-size:1.1rem;font-weight:700;
+                    cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);
+                    transition:transform 0.2s;
+                " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                    🚀 Bắt Đầu
+                </button>
+            </div>
+        `;
+        wrapper.style.position = 'relative';
+        wrapper.appendChild(overlay);
+    },
+
+    _startFromOverlay() {
+        const overlay = document.getElementById('cbc-start-overlay');
+        if (overlay) overlay.remove();
+
+        // Now start the session timer and load puzzle
+        this.sessionStartTime = Date.now();
         this._timerInterval = setInterval(() => this._updateTimer(), 1000);
+        this.loadPuzzle();
     },
 
     _updateTimer() {
@@ -337,6 +568,7 @@ const ChessBoardComponent = {
             position: puzzle.fen,
             orientation: this.playerColor,
             draggable: true,
+            dropOffBoard: 'snapback',
             moveSpeed: 150,
             snapbackSpeed: 100,
             snapSpeed: 80,
@@ -580,22 +812,23 @@ const ChessBoardComponent = {
     },
 
     _showOpponentArrow() {
-        // Show arrow for the OPPONENT's last move (the move computer just played)
-        // This helps user know what happened while pieces are hidden
-        const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
+        // Show arrow for the OPPONENT's last move
+        this._clearAnnotations();
 
-        // If play_mode is 'second', the opponent already played move at index 0
-        // Show that move as an arrow
-        if (this.currentMoveIndex > 0) {
+        if (this.lastOpponentMove) {
+            // Use stored move from playOpponentMove()
+            this._drawArrow(this.lastOpponentMove.from, this.lastOpponentMove.to, 'rgba(142, 68, 173, 0.85)');
+        } else if (this.currentMoveIndex > 0) {
+            // Fallback: reconstruct from PGN data (e.g. second play mode)
+            const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
             const prevNode = this.getMoveNode(puzzle, this.currentMoveIndex - 1);
             if (prevNode) {
-                // Reconstruct the move's from/to
                 const prevFen = this._getFenAtMoveIndex(puzzle, this.currentMoveIndex - 1);
                 if (prevFen) {
                     const tempGame = new Chess(prevFen);
                     try {
                         const result = tempGame.move(prevNode.move);
-                        if (result) this._drawArrow(result.from, result.to);
+                        if (result) this._drawArrow(result.from, result.to, 'rgba(142, 68, 173, 0.85)');
                     } catch (e) { }
                 }
             }
@@ -613,16 +846,14 @@ const ChessBoardComponent = {
         return tempGame.fen();
     },
 
-    _drawArrow(from, to) {
+    _drawArrow(from, to, color) {
+        color = color || 'rgba(243, 156, 18, 0.8)';
         const arrowLayer = document.getElementById('cbc-arrow-layer');
         const boardEl = document.getElementById('cbc-board');
         if (!arrowLayer || !boardEl) return;
 
-        arrowLayer.innerHTML = '';
-
         const boardRect = boardEl.getBoundingClientRect();
         const squareSize = boardRect.width / 8;
-
         const getCenter = (sq) => {
             let col = sq.charCodeAt(0) - 97;
             let row = 8 - parseInt(sq[1]);
@@ -630,17 +861,22 @@ const ChessBoardComponent = {
             return { x: (col + 0.5) * squareSize, y: (row + 0.5) * squareSize };
         };
 
-        const fromPos = getCenter(from);
-        const toPos = getCenter(to);
+        // Reuse or create SVG
+        let svg = arrowLayer.querySelector('svg');
+        if (!svg) {
+            svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', boardRect.width);
+            svg.setAttribute('height', boardRect.height);
+            svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:100;';
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            svg.appendChild(defs);
+            arrowLayer.appendChild(svg);
+        }
 
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('width', boardRect.width);
-        svg.setAttribute('height', boardRect.height);
-        svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:100;';
-
-        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        const markerId = 'cbc-ah-' + Math.random().toString(36).substr(2, 6);
+        const defs = svg.querySelector('defs');
         const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-        marker.setAttribute('id', 'cbc-arrowhead');
+        marker.setAttribute('id', markerId);
         marker.setAttribute('markerWidth', '7');
         marker.setAttribute('markerHeight', '5');
         marker.setAttribute('refX', '6');
@@ -648,25 +884,83 @@ const ChessBoardComponent = {
         marker.setAttribute('orient', 'auto');
         const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         polygon.setAttribute('points', '0 0, 7 2.5, 0 5');
-        polygon.setAttribute('fill', 'rgba(243, 156, 18, 0.8)');
+        polygon.setAttribute('fill', color);
         marker.appendChild(polygon);
         defs.appendChild(marker);
-        svg.appendChild(defs);
 
+        const fromPos = getCenter(from);
+        const toPos = getCenter(to);
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', fromPos.x);
         line.setAttribute('y1', fromPos.y);
         line.setAttribute('x2', toPos.x);
         line.setAttribute('y2', toPos.y);
-        line.setAttribute('stroke', 'rgba(243, 156, 18, 0.7)');
+        line.setAttribute('stroke', color);
         line.setAttribute('stroke-width', '3');
         line.setAttribute('stroke-opacity', '0.8');
         line.setAttribute('stroke-linecap', 'round');
-        line.setAttribute('marker-end', 'url(#cbc-arrowhead)');
+        line.setAttribute('marker-end', `url(#${markerId})`);
         line.classList.add('cbc-arrow-anim');
         svg.appendChild(line);
+    },
 
-        arrowLayer.appendChild(svg);
+    _drawSquareHighlight(square, color) {
+        color = color || 'rgba(235, 97, 80, 0.45)';
+        const arrowLayer = document.getElementById('cbc-arrow-layer');
+        const boardEl = document.getElementById('cbc-board');
+        if (!arrowLayer || !boardEl) return;
+
+        const boardRect = boardEl.getBoundingClientRect();
+        const squareSize = boardRect.width / 8;
+        let col = square.charCodeAt(0) - 97;
+        let row = 8 - parseInt(square[1]);
+        if (this.playerColor === 'black') { col = 7 - col; row = 7 - row; }
+
+        const div = document.createElement('div');
+        div.className = 'cbc-sq-highlight';
+        div.style.cssText = `position:absolute;left:${col * squareSize}px;top:${row * squareSize}px;width:${squareSize}px;height:${squareSize}px;background:${color};pointer-events:none;z-index:99;border-radius:2px;`;
+        arrowLayer.appendChild(div);
+    },
+
+    _clearAnnotations() {
+        const arrowLayer = document.getElementById('cbc-arrow-layer');
+        if (arrowLayer) arrowLayer.innerHTML = '';
+    },
+
+    /**
+     * Clear all visual annotations (arrows, highlights) from the arrow layer
+     */
+    _clearAnnotations() {
+        const arrowLayer = document.getElementById('cbc-arrow-layer');
+        if (arrowLayer) arrowLayer.innerHTML = '';
+    },
+
+    /**
+     * Draw all annotations (arrows + highlights) from a move node
+     */
+    drawAnnotations(moveNode) {
+        this._clearAnnotations();
+        if (!moveNode) return;
+        if (moveNode.arrows) {
+            moveNode.arrows.forEach(a => this._drawArrow(a.from, a.to, a.color));
+        }
+        if (moveNode.highlights) {
+            moveNode.highlights.forEach(h => this._drawSquareHighlight(h.square, h.color));
+        }
+    },
+
+    /**
+     * Show comment in the comment panel
+     */
+    _showMoveComment(moveNode) {
+        const el = document.getElementById('cbc-comment');
+        if (!el) return;
+        if (moveNode?.comment) {
+            el.textContent = `💬 ${moveNode.comment}`;
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
     },
 
     _onMemoryMove(solved) {
@@ -714,48 +1008,46 @@ const ChessBoardComponent = {
     _tryMove(source, target) {
         if (this.waitingForOpponent) return 'snapback';
         if (!this.sessionActive) return 'snapback';
+        if (this._isAutoPlaying) return 'snapback';
 
         const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
-        const node = this.getMoveNode(puzzle, this.currentMoveIndex);
+        const currentMoves = this._isInVariation ? this._variationStack[this._variationStack.length - 1]?.variationMoves : puzzle.solution_moves;
+        const node = currentMoves?.[this.currentMoveIndex];
         if (!node) return 'snapback';
-
-        // Check if it's a capture before making the move
-        const targetPiece = this.game.get(target);
 
         const move = this.game.move({ from: source, to: target, promotion: 'q' });
         if (move === null) return 'snapback';
 
         this.attempts++;
+        this._clearAnnotations();
 
-        const allValidMoves = [node.move, ...(node.alternatives || [])];
-        const isCorrect = allValidMoves.includes(move.san);
+        // Normalize SAN for comparison: strip +, #, !, ?
+        const normalize = (san) => san ? san.replace(/[+#!?]/g, '').trim() : '';
+        const playerSan = normalize(move.san);
+        const mainlineSan = normalize(node.move);
 
-        if (isCorrect) {
-            // Play sound
+        // Check mainline match
+        if (playerSan === mainlineSan) {
             this.playSound(move.captured ? 'capture' : 'move');
+            document.getElementById('cbc-variation-info')?.classList.add('hidden');
 
-            // Show variation info
-            if (move.san !== node.move && node.alternatives?.includes(move.san)) {
-                const varInfo = document.getElementById('cbc-variation-info');
-                const varText = document.getElementById('cbc-variation-text');
-                if (varInfo && varText) {
-                    varText.textContent = `Biến phụ ${move.san} — Đúng!`;
-                    varInfo.classList.remove('hidden');
-                }
-            } else {
-                document.getElementById('cbc-variation-info')?.classList.add('hidden');
+            // Show annotations from this move node
+            if (node.arrows?.length || node.highlights?.length) {
+                this.drawAnnotations(node);
             }
+            this._showMoveComment(node);
 
             this.currentMoveIndex++;
             this.board.position(this.game.fen());
 
-            // Memory mode: handle correct move
-            if (this.mode === 'memory') {
-                this._onMemoryMove(true);
-            }
+            if (this.mode === 'memory') this._onMemoryMove(true);
 
-            if (this.currentMoveIndex >= puzzle.solution_moves.length) {
-                this._onPuzzleSolved();
+            if (this.currentMoveIndex >= currentMoves.length) {
+                if (this._isInVariation) {
+                    this._exitVariation();
+                } else {
+                    this._onPuzzleSolved();
+                }
             } else {
                 this._setStatus('Đúng rồi! ✅', 'var(--success)');
                 this.playSound('correct');
@@ -763,12 +1055,11 @@ const ChessBoardComponent = {
                 setTimeout(() => {
                     this.playOpponentMove();
                     this.waitingForOpponent = false;
-
-                    if (this.currentMoveIndex >= puzzle.solution_moves.length) {
-                        this._onPuzzleSolved();
+                    if (this.currentMoveIndex >= currentMoves.length) {
+                        if (this._isInVariation) this._exitVariation();
+                        else this._onPuzzleSolved();
                     } else {
                         if (this.mode === 'memory') {
-                            // Show arrow for opponent's move that just played
                             this._showOpponentArrow();
                             this._setStatus('🎯 Đến lượt bạn đi!', '#8E44AD');
                         } else {
@@ -777,30 +1068,202 @@ const ChessBoardComponent = {
                     }
                 }, 500);
             }
-        } else {
-            // WRONG MOVE
-            this.game.undo();
-            this.playSound('wrong');
-
-            // Report wrong move for immediate ELO deduction
-            this._reportWrongMove();
-
-            if (this.mode === 'memory') {
-                this._onMemoryMove(false);
-                this._setStatus('Sai rồi! Thử lại nhé ❌', '#E74C3C');
-            } else if (this.mode === 'focus') {
-                this.sessionPuzzlesFailed++;
-                this._setStatus('❌ Sai! Phiên Tập Trung kết thúc.', '#E74C3C');
-                setTimeout(() => this._endSession('focus_fail'), 1200);
-            } else {
-                this._setStatus('Sai rồi, thử lại! ❌', 'var(--danger)');
-                setTimeout(() => this._setStatus('Đến lượt bạn đi!', ''), 1500);
-            }
-
-            return 'snapback';
+            return undefined;
         }
 
-        return undefined;
+        // Check variations (Basic + Focus modes get full variation interaction)
+        if ((this.mode === 'basic' || this.mode === 'focus') && node.variations?.length > 0) {
+            for (const variation of node.variations) {
+                if (variation.length > 0 && normalize(variation[0].move) === playerSan) {
+                    const firstVarNode = variation[0];
+                    const isBadMove = firstVarNode.nags?.some(n => n === 2 || n === 4);
+
+                    if (isBadMove) {
+                        // BAD variation: show refutation auto-play
+                        this.playSound('wrong');
+                        this._setStatus('❌ Đây là nước sai lầm!', '#E74C3C');
+                        this._reportWrongMove();
+                        this._madeWrongMove = true;
+
+                        // Auto-play bad variation
+                        this._autoPlayBadVariation(variation, this.game.fen());
+                        return undefined;
+                    } else {
+                        // GOOD variation: acknowledge and let player continue in it
+                        this.playSound(move.captured ? 'capture' : 'move');
+                        this._setStatus('✅ Nước cũng hay! Đi tiếp biến phụ...', '#27AE60');
+                        this.playSound('variation_enter');
+
+                        const varInfo = document.getElementById('cbc-variation-info');
+                        const varText = document.getElementById('cbc-variation-text');
+                        if (varInfo && varText) {
+                            varText.textContent = `Biến phụ: ${move.san}`;
+                            varInfo.classList.remove('hidden');
+                        }
+
+                        // Push current context to stack
+                        this._variationStack.push({
+                            moves: currentMoves,
+                            moveIndex: this.currentMoveIndex,
+                            fen: this.game.fen(),
+                            variationMoves: variation,
+                            isPlayerVariation: true
+                        });
+                        this._isInVariation = true;
+                        this.currentMoveIndex = 1; // Skip first move (player already played it)
+                        this.board.position(this.game.fen());
+
+                        // Show annotations
+                        if (firstVarNode.arrows?.length || firstVarNode.highlights?.length) {
+                            this.drawAnnotations(firstVarNode);
+                        }
+                        this._showMoveComment(firstVarNode);
+
+                        // Continue variation: play opponent's next move if any
+                        if (variation.length > 1) {
+                            this.waitingForOpponent = true;
+                            setTimeout(() => {
+                                this.playOpponentMove();
+                                this.waitingForOpponent = false;
+                                if (this.currentMoveIndex >= variation.length) {
+                                    this._exitVariation();
+                                } else {
+                                    this._setStatus('Đến lượt bạn đi (biến phụ)!', '#27AE60');
+                                }
+                            }, 500);
+                        } else {
+                            this._exitVariation();
+                        }
+                        return undefined;
+                    }
+                }
+            }
+        }
+
+        // Check flat alternatives (backward compat for Focus/Memory)
+        const allValidMoves = [node.move, ...(node.alternatives || [])];
+        const isAltCorrect = allValidMoves.some(m => normalize(m) === playerSan);
+
+        if (isAltCorrect) {
+            this.playSound(move.captured ? 'capture' : 'move');
+            const varInfo = document.getElementById('cbc-variation-info');
+            const varText = document.getElementById('cbc-variation-text');
+            if (varInfo && varText) {
+                varText.textContent = `Biến phụ ${move.san} — Đúng!`;
+                varInfo.classList.remove('hidden');
+            }
+            this.currentMoveIndex++;
+            this.board.position(this.game.fen());
+            if (this.mode === 'memory') this._onMemoryMove(true);
+            if (this.currentMoveIndex >= currentMoves.length) {
+                this._onPuzzleSolved();
+            } else {
+                this._setStatus('Đúng rồi! ✅', 'var(--success)');
+                this.playSound('correct');
+                this.waitingForOpponent = true;
+                setTimeout(() => {
+                    this.playOpponentMove();
+                    this.waitingForOpponent = false;
+                    if (this.currentMoveIndex >= currentMoves.length) {
+                        this._onPuzzleSolved();
+                    } else {
+                        this._setStatus('Đến lượt bạn đi!', '');
+                    }
+                }, 500);
+            }
+            return undefined;
+        }
+
+        // WRONG MOVE — no match anywhere
+        this.game.undo();
+        this.playSound('wrong');
+        this._reportWrongMove();
+        this._madeWrongMove = true;
+
+        if (this.mode === 'memory') {
+            this._onMemoryMove(false);
+            this._setStatus('Sai rồi! Thử lại nhé ❌', '#E74C3C');
+        } else if (this.mode === 'focus') {
+            this.sessionPuzzlesFailed++;
+            this._setStatus('❌ Sai! Phiên Tập Trung kết thúc.', '#E74C3C');
+            setTimeout(() => this._endSession('focus_fail'), 1200);
+        } else {
+            this._setStatus('Sai rồi, thử lại! ❌', 'var(--danger)');
+            setTimeout(() => this._setStatus('Đến lượt bạn đi!', ''), 1500);
+        }
+
+        return 'snapback';
+    },
+
+    /**
+     * Auto-play a bad variation (refutation) at 2s/move, then restore
+     */
+    _autoPlayBadVariation(variation, startFen) {
+        this._isAutoPlaying = true;
+        const varInfo = document.getElementById('cbc-variation-info');
+        const varText = document.getElementById('cbc-variation-text');
+        if (varInfo && varText) {
+            varText.textContent = 'Xem phản bác nước sai...';
+            varInfo.classList.remove('hidden');
+        }
+
+        let idx = 1; // First move already played by player
+        const playNext = () => {
+            if (idx >= variation.length || !this.sessionActive) {
+                // Done: restore position
+                this._isAutoPlaying = false;
+                this.game.load(startFen);
+                this.game.undo(); // Back to before player's move
+                this.board.position(this.game.fen());
+                this._setStatus('↩ Quay lại tìm nước hay hơn!', '#3498db');
+                if (varInfo) varInfo.classList.add('hidden');
+                this._clearAnnotations();
+                setTimeout(() => this._setStatus('Đến lượt bạn đi!', ''), 2000);
+                return;
+            }
+            const vNode = variation[idx];
+            try {
+                const result = this.game.move(vNode.move);
+                if (result) {
+                    this.board.position(this.game.fen());
+                    this.playSound(result.captured ? 'capture' : 'move');
+                    this._showMoveComment(vNode);
+                }
+            } catch (e) { }
+            idx++;
+            setTimeout(playNext, 2000);
+        };
+        setTimeout(playNext, 1500);
+    },
+
+    /**
+     * Exit current variation and return to mainline
+     */
+    _exitVariation() {
+        if (this._variationStack.length === 0) {
+            this._isInVariation = false;
+            this._onPuzzleSolved();
+            return;
+        }
+
+        const ctx = this._variationStack.pop();
+        this._isInVariation = this._variationStack.length > 0;
+
+        // Restore chess position to before the variation
+        const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
+        const restoreFen = this._getFenAtMoveIndex(puzzle, ctx.moveIndex);
+        if (restoreFen) {
+            this.game.load(restoreFen);
+            this.board.position(this.game.fen());
+        }
+
+        this.currentMoveIndex = ctx.moveIndex;
+        this._setStatus('↩ Quay lại biến chính!', '#3498db');
+        this._clearAnnotations();
+        document.getElementById('cbc-variation-info')?.classList.add('hidden');
+        document.getElementById('cbc-comment')?.classList.add('hidden');
+
+        setTimeout(() => this._setStatus('Đến lượt bạn đi!', ''), 1500);
     },
 
     // ═════════════════════════════════════════
@@ -808,7 +1271,21 @@ const ChessBoardComponent = {
     // ═════════════════════════════════════════
     playOpponentMove() {
         const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
-        const node = this.getMoveNode(puzzle, this.currentMoveIndex);
+
+        // If in a variation, use variation moves instead of mainline
+        let currentMoves;
+        if (this._isInVariation && this._variationStack.length > 0) {
+            const ctx = this._variationStack[this._variationStack.length - 1];
+            currentMoves = ctx.variationMoves;
+        } else {
+            currentMoves = puzzle.solution_moves;
+        }
+
+        if (this.currentMoveIndex >= currentMoves.length) return;
+
+        const node = typeof currentMoves[this.currentMoveIndex] === 'string'
+            ? { move: currentMoves[this.currentMoveIndex], alternatives: [] }
+            : currentMoves[this.currentMoveIndex];
         if (!node) return;
 
         if (node.alternatives?.length > 0) {
@@ -826,8 +1303,11 @@ const ChessBoardComponent = {
             const moveResult = this.game.move(node.move);
             this.board.position(this.game.fen());
             this.currentMoveIndex++;
-            // Play sound for opponent
-            if (moveResult) this.playSound(moveResult.captured ? 'capture' : 'move');
+            // Store opponent move for arrow display in memory mode
+            if (moveResult) {
+                this.lastOpponentMove = { from: moveResult.from, to: moveResult.to };
+                this.playSound(moveResult.captured ? 'capture' : 'move');
+            }
         } catch (e) {
             console.error('Opponent move error:', e, node.move);
         }
@@ -869,16 +1349,26 @@ const ChessBoardComponent = {
             console.error('Solve error:', err);
         }
 
-        // AUTO-ADVANCE to next puzzle after 1.5 seconds (allow ELO popup to show)
-        setTimeout(() => {
-            if (!this.sessionActive) return;
-            this.currentPuzzleIdx++;
-            if (this.currentPuzzleIdx >= this.pgnSource.puzzles.length) {
-                this._endSession('complete');
-            } else {
+        // Check if mistakes were made — if so, must re-solve cleanly
+        if (this._madeWrongMove && this.mode !== 'focus') {
+            this._setStatus('↩ Giải lại lần nữa cho đúng hết nhé!', '#e67e22');
+            setTimeout(() => {
+                if (!this.sessionActive) return;
+                this._madeWrongMove = false;
                 this.loadPuzzle();
-            }
-        }, 1500);
+            }, 2000);
+        } else {
+            // AUTO-ADVANCE to next puzzle after 1.5 seconds (allow ELO popup to show)
+            setTimeout(() => {
+                if (!this.sessionActive) return;
+                this.currentPuzzleIdx++;
+                if (this.currentPuzzleIdx >= this.pgnSource.puzzles.length) {
+                    this._endSession('complete');
+                } else {
+                    this.loadPuzzle();
+                }
+            }, 1500);
+        }
     },
 
     _showEloPopup(change) {
@@ -1039,14 +1529,15 @@ const ChessBoardComponent = {
     // ═════════════════════════════════════════
     getHint() {
         const puzzle = this.pgnSource?.puzzles?.[this.currentPuzzleIdx];
-        const node = this.getMoveNode(puzzle, this.currentMoveIndex);
+        const currentMoves = this._isInVariation ? this._variationStack[this._variationStack.length - 1]?.variationMoves : puzzle?.solution_moves;
+        const node = currentMoves?.[this.currentMoveIndex];
         if (!node) return;
 
         this.hintsUsed++;
         const hintEl = document.getElementById('cbc-hints');
         if (hintEl) hintEl.textContent = this.hintsUsed;
 
-        // Apply -10 ELO penalty for using hint
+        // ELO penalty
         if (this.isEloRated) {
             Toast.error('⚠️ Dùng gợi ý: -10 ELO');
             (async () => {
@@ -1059,17 +1550,41 @@ const ChessBoardComponent = {
                         this.sessionEloChange += result.elo_change;
                         this._showEloPopup(result.elo_change);
                     }
-                } catch (err) {
-                    console.error('Hint penalty error:', err);
-                }
+                } catch (err) { console.error('Hint penalty error:', err); }
             })();
         }
 
-        let hintText = `💡 Gợi ý: ${node.move}`;
-        if (node.alternatives?.length > 0) {
-            hintText += ` (hoặc: ${node.alternatives.join(', ')})`;
+        // Progressive hints
+        if (this.hintsUsed === 1) {
+            // Hint 1: Highlight source square
+            const tempGame = new Chess(this.game.fen());
+            try {
+                const result = tempGame.move(node.move);
+                if (result) {
+                    this._clearAnnotations();
+                    this._drawSquareHighlight(result.from, 'rgba(46, 204, 113, 0.5)');
+                    Toast.info('💡 Gợi ý: quân cần di chuyển được tô sáng!');
+                }
+            } catch (e) { Toast.info(`💡 Gợi ý: ${node.move}`); }
+        } else if (this.hintsUsed === 2) {
+            // Hint 2: Draw arrow from source to target
+            const tempGame = new Chess(this.game.fen());
+            try {
+                const result = tempGame.move(node.move);
+                if (result) {
+                    this._clearAnnotations();
+                    this._drawArrow(result.from, result.to, 'rgba(46, 204, 113, 0.8)');
+                    Toast.info('💡 Gợi ý: xem mũi tên!');
+                }
+            } catch (e) { Toast.info(`💡 Gợi ý: ${node.move}`); }
+        } else {
+            // Hint 3+: Show SAN text
+            let hintText = `💡 Gợi ý: ${node.move}`;
+            if (node.alternatives?.length > 0) {
+                hintText += ` (hoặc: ${node.alternatives.join(', ')})`;
+            }
+            Toast.info(hintText);
         }
-        Toast.info(hintText);
     },
 
     resetPuzzle() {

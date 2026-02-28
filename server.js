@@ -50,6 +50,17 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Auto-migration: add new columns if missing
+(async () => {
+    try {
+        const db = require('./config/database');
+        await db.query(`ALTER TABLE puzzle_sets ADD COLUMN group_name VARCHAR(100) DEFAULT NULL`);
+        console.log('✅ Migration: added group_name to puzzle_sets');
+    } catch (e) {
+        if (e.code !== 'ER_DUP_FIELDNAME') console.error('Migration note:', e.message);
+    }
+})();
+
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));

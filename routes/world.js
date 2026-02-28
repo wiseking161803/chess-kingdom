@@ -244,8 +244,14 @@ router.post('/raid', authenticate, async (req, res) => {
 
             for (const attacker of turnOrder) {
                 if (attacker.hp <= 0) continue; // died this turn
+                // Re-check opponents alive (critical: someone may have died this turn)
                 const opponents = (attacker.side === 'atk' ? defC : atkC).filter(c => c.hp > 0);
                 if (opponents.length === 0) break;
+
+                // Check if battle is over (one side wiped)
+                const atkStillAlive = atkC.filter(c => c.hp > 0).length;
+                const defStillAlive = defC.filter(c => c.hp > 0).length;
+                if (atkStillAlive === 0 || defStillAlive === 0) break;
 
                 // Target priority: front row first, then back row
                 // Within same row, target lowest HP
@@ -261,8 +267,10 @@ router.post('/raid', authenticate, async (req, res) => {
 
                 battleLog.push({
                     turn, side: attacker.side, damage: dmg, crit,
-                    attacker: attacker.name, atkElement: attacker.element, atkSpd: attacker.spd,
-                    target: target.name, defElement: target.element,
+                    attacker: attacker.name, attackerId: attacker.id,
+                    atkElement: attacker.element, atkSpd: attacker.spd,
+                    target: target.name, targetId: target.id,
+                    defElement: target.element,
                     elemBonus: em !== 1 ? Math.round((em - 1) * 100) : 0,
                     atkHp: attacker.hp, defHp: Math.max(0, target.hp)
                 });
@@ -271,7 +279,9 @@ router.post('/raid', authenticate, async (req, res) => {
 
         const atkAlive = atkC.filter(c => c.hp > 0).length;
         const defAlive = defC.filter(c => c.hp > 0).length;
-        const attackerWins = defAlive === 0 || atkAlive > defAlive;
+        // Attacker wins if defender team is wiped out.
+        // If time runs out (50 turns), whoever has more alive wins. Tie = defender wins (home advantage).
+        const attackerWins = defAlive === 0 ? true : (atkAlive === 0 ? false : atkAlive > defAlive);
         const winnerId = attackerWins ? attackerId : defender_id;
 
         // Update all dragon HP
@@ -312,8 +322,8 @@ router.post('/raid', authenticate, async (req, res) => {
             winner: attackerWins ? 'attacker' : 'defender',
             coins_stolen: coinsStolen,
             battle_log: battleLog,
-            atk_team: atkC.map(c => ({ name: c.name, element: c.element, level: c.level, hp: Math.max(0, c.hp), maxHp: c.maxHp, startHp: c.startHp || c.maxHp, att: c.att, def: c.def, spd: c.spd, position: c.position })),
-            def_team: defC.map(c => ({ name: c.name, element: c.element, level: c.level, hp: Math.max(0, c.hp), maxHp: c.maxHp, startHp: c.startHp || c.maxHp, att: c.att, def: c.def, spd: c.spd, position: c.position })),
+            atk_team: atkC.map(c => ({ id: c.id, name: c.name, element: c.element, level: c.level, hp: Math.max(0, c.hp), maxHp: c.maxHp, startHp: c.startHp || c.maxHp, att: c.att, def: c.def, spd: c.spd, position: c.position })),
+            def_team: defC.map(c => ({ id: c.id, name: c.name, element: c.element, level: c.level, hp: Math.max(0, c.hp), maxHp: c.maxHp, startHp: c.startHp || c.maxHp, att: c.att, def: c.def, spd: c.spd, position: c.position })),
             attacker: {
                 name: atkUser[0]?.display_name || 'Bạn',
                 dragon_name: atkC[0].name, dragon_level: atkC[0].level,

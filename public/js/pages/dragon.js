@@ -175,7 +175,7 @@ const DragonPage = {
             { icon: '🎯', val: fmtStatPct(totalCrit.toFixed(1), parseFloat(d.crit_rate || 5).toFixed(1), critBonus > 0 ? critBonus.toFixed(1) : 0), c: '#9b59b6' },
             { icon: '💥', val: fmtStatPct(totalCDmg.toFixed(1), parseFloat(d.crit_dmg || 150).toFixed(1), cdmgBonus > 0 ? cdmgBonus.toFixed(1) : 0), c: '#e91e63' }
         ];
-        const statsBarHTML = miniStats.map(s => `<div style="display:flex;align-items:center;gap:3px;padding:4px 8px;border-radius:8px;background:rgba(255,255,255,0.06);font-size:0.72rem">
+        const statsBarHTML = miniStats.map(s => `<div style="display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.06);font-size:0.85rem">
             <span style="color:${s.c}">${s.icon}</span> ${s.val}
         </div>`).join('');
 
@@ -189,7 +189,7 @@ const DragonPage = {
             const eq = equipped[s.key];
             const rc = eq ? this.rarityColor(eq.rarity) : 'rgba(100,100,100,0.3)';
             const rarityBg = eq ? `radial-gradient(circle at 50% 30%, ${rc}15, transparent 70%)` : 'none';
-            return `<div onclick="DragonPage.showSlotEquipment('${s.key}')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 2px;border-radius:8px;background:rgba(255,255,255,0.04);background-image:${rarityBg};border:1.5px ${eq ? 'solid' : 'dashed'} ${eq ? rc : 'rgba(255,255,255,0.08)'};cursor:pointer;transition:all 0.2s;position:relative" id="eq-grid-${s.key}" title="${eq ? `${eq.name}\n${this.getStatsList(eq).join(' · ')}` : s.label + ' - Trống'}">
+            return `<div onclick="DragonPage.showSlotEquipment('${s.key}')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;border-radius:10px;background:${eq ? `rgba(255,255,255,0.06)` : 'rgba(255,255,255,0.02)'};background-image:${rarityBg};border:2px ${eq ? 'solid' : 'dashed'} ${eq ? rc : 'rgba(255,215,0,0.35)'};cursor:pointer;transition:all 0.2s;position:relative;box-shadow:${eq ? `0 0 6px ${rc}30` : '0 0 4px rgba(255,215,0,0.08)'}" id="eq-grid-${s.key}" title="${eq ? `${eq.name}\n${this.getStatsList(eq).join(' · ')}` : s.label + ' - Trống'}">
                 <div style="font-size:1.1rem;filter:${eq ? 'none' : 'grayscale(0.8) opacity(0.3)'}">${eq ? eq.icon : s.icon}</div>
                 <div style="font-size:0.42rem;${eq ? `color:${rc};font-weight:600` : 'opacity:0.3'};margin-top:1px;text-align:center;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${eq ? eq.name : s.label}</div>
                 ${eq && eq.star_level > 0 ? `<div style="position:absolute;bottom:1px;font-size:0.4rem;color:#FFD700">${this.starDisplay(eq.star_level)}</div>` : ''}
@@ -243,7 +243,8 @@ const DragonPage = {
                         <div style="position:absolute;bottom:0;left:0;right:0;padding:8px 12px;background:linear-gradient(transparent,rgba(0,0,0,0.7))">
                             <div style="display:flex;align-items:end;justify-content:space-between">
                                 <div>
-                                    <div style="font-size:1.1rem;font-weight:800;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.5)">${d.name}</div>
+                                    <div style="font-size:1.1rem;font-weight:800;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.5);display:inline">${d.name}</div>
+                                    <span onclick="DragonPage.renameDragon(${d.id}, '${d.name.replace(/'/g, "\\'")}')" style="cursor:pointer;font-size:0.7rem;opacity:0.7;margin-left:4px;vertical-align:middle" title="Đổi tên rồng">✏️</span>
                                     <div style="font-size:0.7rem;color:rgba(255,255,255,0.85)">Lv.${d.level} · <span style="color:${ec}">${elementNames[d.element] || d.element}</span></div>
                                 </div>
                                 <div style="text-align:right">
@@ -257,8 +258,8 @@ const DragonPage = {
 
                     <!-- HP BAR -->
                     <div style="padding:4px 8px;border-radius:8px;background:rgba(255,255,255,0.04);margin-bottom:6px">
-                        <div style="display:flex;justify-content:space-between;font-size:0.68rem;margin-bottom:2px">
-                            <span>❤️ HP ${hpBonus > 0 ? `<span style="font-size:0.55rem;opacity:0.6">(${d.hp}<span style="color:#2ecc71">+${hpBonus}</span>)</span>` : ''}</span>
+                        <div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:2px">
+                            <span>❤️ HP ${hpBonus > 0 ? `<span style="font-size:0.68rem;opacity:0.6">(${d.hp}<span style="color:#2ecc71">+${hpBonus}</span>)</span>` : ''}</span>
                             <span style="font-weight:700;color:${hpPct < 30 ? '#e74c3c' : hpPct < 60 ? '#f39c12' : '#2ecc71'}">${currentHp}/${maxHp}</span>
                         </div>
                         <div style="height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden">
@@ -274,17 +275,17 @@ const DragonPage = {
 
                     <!-- EQUIPMENT GRID (6 columns, compact) -->
                     <div style="margin:6px 0">
-                        <div style="font-size:0.65rem;font-weight:600;opacity:0.5;margin-bottom:4px">⚔️ Trang Bị <span style="font-weight:400;font-size:0.55rem">(nhấn để chọn)</span></div>
-                        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px">${eqGridHTML}</div>
+                        <div style="font-size:0.8rem;font-weight:600;opacity:0.5;margin-bottom:4px">⚔️ Trang Bị <span style="font-weight:400;font-size:0.68rem">(nhấn để chọn)</span></div>
+                        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px">${eqGridHTML}</div>
                         <div id="eq-slot-detail" style="margin-top:6px"></div>
                     </div>
 
                     <!-- TABS -->
-                    <div class="dd-tabs" style="display:flex;gap:4px;margin:6px 0;flex-wrap:wrap">
-                        <div class="tab active" onclick="DragonPage.switchTab('feed', this)" style="flex:1;text-align:center;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;font-weight:700;background:linear-gradient(135deg,rgba(230,126,34,0.25),rgba(230,126,34,0.1));border:1.5px solid rgba(230,126,34,0.4);color:#e67e22;transition:all 0.2s">🍖 Cho Ăn</div>
-                        <div class="tab" onclick="DragonPage.switchTab('formation', this)" style="flex:1;text-align:center;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;font-weight:700;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.1);transition:all 0.2s">🏰 Đội Hình</div>
-                        <div class="tab" onclick="DragonPage.switchTab('merge', this)" style="flex:1;text-align:center;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;font-weight:700;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.1);transition:all 0.2s">✨ Ghép Sao</div>
-                        <div class="tab" onclick="DragonPage.switchTab('eggs', this)" style="flex:1;text-align:center;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;font-weight:700;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.1);transition:all 0.2s">🥚 Trứng</div>
+                    <div class="dd-tabs" style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">
+                        <div class="tab active" onclick="DragonPage.switchTab('feed', this)" style="flex:1;text-align:center;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:0.9rem;font-weight:700;background:linear-gradient(135deg,rgba(230,126,34,0.25),rgba(230,126,34,0.1));border:2.5px solid rgba(230,126,34,0.6);color:#e67e22;transition:all 0.2s;box-shadow:0 0 8px rgba(230,126,34,0.15)">🍖 Cho Ăn</div>
+                        <div class="tab" onclick="DragonPage.switchTab('formation', this)" style="flex:1;text-align:center;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:0.9rem;font-weight:700;background:rgba(255,255,255,0.06);border:2.5px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);transition:all 0.2s">🏰 Đội Hình</div>
+                        <div class="tab" onclick="DragonPage.switchTab('merge', this)" style="flex:1;text-align:center;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:0.9rem;font-weight:700;background:rgba(255,255,255,0.06);border:2.5px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);transition:all 0.2s">✨ Ghép Sao</div>
+                        <div class="tab" onclick="DragonPage.switchTab('eggs', this)" style="flex:1;text-align:center;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:0.9rem;font-weight:700;background:rgba(255,255,255,0.06);border:2.5px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);transition:all 0.2s">🥚 Trứng</div>
                     </div>
 
                     <!-- Tab: Feed -->
@@ -777,8 +778,9 @@ const DragonPage = {
         document.querySelectorAll('#dragon-den-modal .dd-tabs .tab').forEach(t => {
             t.classList.remove('active');
             t.style.background = 'rgba(255,255,255,0.04)';
-            t.style.borderColor = 'rgba(255,255,255,0.1)';
+            t.style.borderColor = 'rgba(255,255,255,0.15)';
             t.style.color = '';
+            t.style.boxShadow = 'none';
         });
         btn.classList.add('active');
         const tc = tabColors[tab];
@@ -786,6 +788,7 @@ const DragonPage = {
             btn.style.background = tc.bg;
             btn.style.borderColor = tc.border;
             btn.style.color = tc.color;
+            btn.style.boxShadow = `0 0 10px ${tc.border}`;
         }
         ['equip', 'merge', 'formation', 'feed', 'eggs', 'evolve'].forEach(t => {
             const el = document.getElementById('dragon-tab-' + t);
@@ -888,5 +891,19 @@ const DragonPage = {
 
     rarityColor(r) { if (r === 'mythic') return '#FF1493'; return { common: '#9E9E9E', rare: '#2196F3', epic: '#9C27B0', legendary: '#FF9800' }[r] || '#666'; },
     rarityLabel(r) { if (r === 'mythic') return 'Thần Thoại'; return { common: '🟢 Thường', rare: '🔵 Hiếm', epic: '🟣 Huyền Thoại', legendary: '🟡 Thần Thoại' }[r] || r; },
-    slotLabel(s) { return { hat: '🎩', sword: '⚔️', armor: '🛡️', pants: '👖', glasses: '👓', shoes: '👟' }[s] || s; }
+    slotLabel(s) { return { hat: '🎩', sword: '⚔️', armor: '🛡️', pants: '👖', glasses: '👓', shoes: '👟' }[s] || s; },
+
+    async renameDragon(dragonId, currentName) {
+        const newName = prompt(`✏️ Đổi tên rồng\n\nTên hiện tại: ${currentName}\nNhập tên mới (2-20 ký tự):`, currentName);
+        if (!newName || newName.trim() === currentName) return;
+        try {
+            const result = await API.post('/dragons/rename', { dragon_id: dragonId, new_name: newName.trim() });
+            Toast.success(result.message);
+            // Reopen dragon den to reflect changes
+            Modal.hide('dragon-den-modal');
+            setTimeout(() => this.open(), 300);
+        } catch (e) {
+            Toast.error(e.message || 'Lỗi đổi tên');
+        }
+    }
 };

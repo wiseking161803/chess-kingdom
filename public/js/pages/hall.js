@@ -167,13 +167,12 @@ const HallPage = {
         const update = () => {
             const el = document.getElementById('hall-countdown');
             if (!el) { clearInterval(this._countdownTimer); return; }
-            // Next 6:00 AM UTC+7 = 23:00 UTC previous day
+            // Next 6:00 AM local time (user is UTC+7)
             const now = new Date();
-            const vnNow = new Date(now.getTime() + 7 * 3600000);
-            const target = new Date(vnNow);
+            const target = new Date(now);
             target.setHours(6, 0, 0, 0);
-            if (vnNow >= target) target.setDate(target.getDate() + 1);
-            const diff = target - vnNow;
+            if (now >= target) target.setDate(target.getDate() + 1);
+            const diff = target - now;
             const h = Math.floor(diff / 3600000);
             const m = Math.floor((diff % 3600000) / 60000);
             const s = Math.floor((diff % 60000) / 1000);
