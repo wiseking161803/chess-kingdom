@@ -507,7 +507,11 @@ const ChessBoardComponent = {
         // Now start the session timer and load puzzle
         this.sessionStartTime = Date.now();
         this._timerInterval = setInterval(() => this._updateTimer(), 1000);
-        this.loadPuzzle();
+        try {
+            this.loadPuzzle();
+        } catch (e) {
+            console.error('loadPuzzle error:', e);
+        }
     },
 
     _updateTimer() {
@@ -692,10 +696,12 @@ const ChessBoardComponent = {
     _startNormalPlay(puzzle) {
         if (this.playMode === 'second') {
             this.waitingForOpponent = true;
+            this._lockBoard();
             this._setStatus('👀 Quan sát nước đi...', 'var(--info)');
             setTimeout(() => {
                 this.playOpponentMove();
                 this.waitingForOpponent = false;
+                this._unlockBoard();
                 this._setStatus('Đến lượt bạn đi!', '');
             }, 800);
         } else {
@@ -772,18 +778,20 @@ const ChessBoardComponent = {
         }
     },
 
-    // Flash/glow effect on from and to squares (used in memory mode)
+    // Flash/glow effect using chessground drawable (used in memory mode)
     _flashMoveSquares(from, to) {
-        const boardEl = document.getElementById('cbc-board');
-        if (!boardEl) return;
-
-        [from, to].forEach(sq => {
-            const sqEl = boardEl.querySelector(`[data-square="${sq}"]`);
-            if (sqEl) {
-                sqEl.classList.add('cbc-flash-move');
-                setTimeout(() => sqEl.classList.remove('cbc-flash-move'), 2500);
-            }
-        });
+        if (!this.board) return;
+        // Temporarily show squares as highlighted, then clear after 2.5s
+        const shapes = [
+            { orig: from, brush: 'green' },
+            { orig: to, brush: 'green' }
+        ];
+        this._currentAutoShapes = shapes;
+        this.board.set({ drawable: { autoShapes: shapes } });
+        setTimeout(() => {
+            this._currentAutoShapes = [];
+            if (this.board) this.board.set({ drawable: { autoShapes: [] } });
+        }, 2500);
     },
 
     _getFenAtMoveIndex(puzzle, targetIdx) {
