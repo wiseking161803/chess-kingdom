@@ -71,6 +71,9 @@ const ChessBoardComponent = {
     // Retry logic: track mistakes
     _madeWrongMove: false,
 
+    // Focus mode: deferred solve queue (only submit on successful completion)
+    _focusSolveQueue: [],
+
     // Audio context
     audioCtx: null,
 
@@ -323,6 +326,7 @@ const ChessBoardComponent = {
         this._isAutoPlaying = false;
         this._variationsDone = false;
         this._madeWrongMove = false;
+        this._focusSolveQueue = [];
 
         // Preload piece images
         this._preloadPieceImages();
@@ -602,8 +606,6 @@ const ChessBoardComponent = {
         if (this.game.game_over()) return false;
         if (this.waitingForOpponent) return false;
         if (this.memoryPhase === 'memorize') return false;
-        // Memory mode: block dragging when pieces are hidden to prevent revealing piece identity
-        if (this.mode === 'memory' && this.memoryPhase === 'hidden') return false;
 
         const currentTurn = this.game.turn();
         const playerSide = this.playerColor === 'white' ? 'w' : 'b';
@@ -810,8 +812,10 @@ const ChessBoardComponent = {
         if (!boardEl) return;
         if (hidden) {
             boardEl.classList.add('cbc-pieces-hidden');
+            document.body.classList.add('cbc-memory-hidden');
         } else {
             boardEl.classList.remove('cbc-pieces-hidden');
+            document.body.classList.remove('cbc-memory-hidden');
         }
     },
 
@@ -1349,30 +1353,42 @@ const ChessBoardComponent = {
         const solvedEl = document.getElementById('cbc-solved-count');
         if (solvedEl) solvedEl.textContent = `✅ ${this.sessionPuzzlesSolved}`;
 
-        // Submit to backend
-        // Focus mode: if wrong moves were made, do NOT count as solved
-        const actualSolved = !(this.mode === 'focus' && this._madeWrongMove);
-        try {
-            const result = await API.post('/puzzles/solve', {
+        // Focus mode: DEFER all solve submissions until session completes successfully
+        if (this.mode === 'focus') {
+            this._focusSolveQueue.push({
                 puzzle_set_id: this.pgnSource.puzzle_set.id,
                 puzzle_index: puzzle.puzzle_index,
-                solved: actualSolved,
+                solved: true,
                 attempts: this.attempts,
                 hints_used: this.hintsUsed,
                 time_seconds: timeSeconds,
                 mode: this.mode,
                 is_elo_rated: this.isEloRated
             });
+        } else {
+            // Non-focus modes: submit immediately
+            try {
+                const result = await API.post('/puzzles/solve', {
+                    puzzle_set_id: this.pgnSource.puzzle_set.id,
+                    puzzle_index: puzzle.puzzle_index,
+                    solved: true,
+                    attempts: this.attempts,
+                    hints_used: this.hintsUsed,
+                    time_seconds: timeSeconds,
+                    mode: this.mode,
+                    is_elo_rated: this.isEloRated
+                });
 
-            if (result.elo_change !== undefined) {
-                this.sessionEloChange += result.elo_change;
-                this._showEloPopup(result.elo_change);
+                if (result.elo_change !== undefined) {
+                    this.sessionEloChange += result.elo_change;
+                    this._showEloPopup(result.elo_change);
+                }
+            } catch (err) {
+                console.error('Solve error:', err);
             }
-        } catch (err) {
-            console.error('Solve error:', err);
         }
 
-        // Check if mistakes were made — if so, must re-solve cleanly
+        // Check if mistakes were made — if so, must re-solve cleanly (non-focus only)
         if (this._madeWrongMove && this.mode !== 'focus') {
             this._setStatus('↩ Giải lại lần nữa cho đúng hết nhé!', '#e67e22');
             setTimeout(() => {
@@ -1381,7 +1397,7 @@ const ChessBoardComponent = {
                 this.loadPuzzle();
             }, 2000);
         } else {
-            // AUTO-ADVANCE to next puzzle after 1.5 seconds (allow ELO popup to show)
+            // AUTO-ADVANCE to next puzzle after 1.5 seconds
             setTimeout(() => {
                 if (!this.sessionActive) return;
                 this.currentPuzzleIdx++;
@@ -1444,6 +1460,26 @@ const ChessBoardComponent = {
         this.sessionActive = false;
         clearInterval(this._timerInterval);
         if (this.memoryTimer) clearInterval(this.memoryTimer);
+        document.body.classList.remove('cbc-memory-hidden');
+
+        // Focus mode: flush or discard deferred solve queue
+        if (this.mode === 'focus') {
+            if (reason === 'complete') {
+                // Session successful — submit ALL queued solves now
+                this._focusSolveQueue.forEach(async (data) => {
+                    try {
+                        const result = await API.post('/puzzles/solve', data);
+                        if (result.elo_change !== undefined) {
+                            this.sessionEloChange += result.elo_change;
+                        }
+                    } catch (err) { console.error('Focus solve flush error:', err); }
+                });
+            } else {
+                // Session failed — discard queue, nothing gets saved
+                console.log(`🎯 Focus session failed (${reason}): discarded ${this._focusSolveQueue.length} queued solves`);
+            }
+            this._focusSolveQueue = [];
+        }
 
         const totalTime = Math.round((Date.now() - this.sessionStartTime) / 1000);
         const totalPuzzles = this.sessionPuzzlesSolved + this.sessionPuzzlesFailed;

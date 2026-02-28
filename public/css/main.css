@@ -2670,6 +2670,15 @@ body>img[data-piece] {
     z-index: 11000 !important;
 }
 
+/* Memory hidden mode: ALSO hide dragged/floating pieces so drag doesn't reveal piece identity */
+body.cbc-memory-hidden>img[data-piece],
+body.cbc-memory-hidden img.piece-417db[style*="position: absolute"],
+body.cbc-memory-hidden img[data-piece][style*="position: absolute"],
+body.cbc-memory-hidden img[data-piece][style*="position:absolute"] {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
 /* Smooth piece movement — improved easing */
 #cbc-board img {
     transition: none;
