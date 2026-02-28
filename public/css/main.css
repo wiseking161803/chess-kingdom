@@ -2665,11 +2665,6 @@ textarea {
     height: 100%;
 }
 
-/* Board skin overrides — when skin CSS vars are set, override chessground brown theme */
-#cbc-board cg-board[style*="--cg-light"] {
-    background-image: none !important;
-    background-color: var(--cg-light, #f0d9b5) !important;
-}
 
 /* Memory mode: hide pieces on the board (chessground uses <piece> elements) */
 #cbc-board.cbc-pieces-hidden .cg-wrap piece {

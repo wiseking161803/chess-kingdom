@@ -237,11 +237,21 @@ const ChessBoardComponent = {
             wrapper.style.setProperty('--board-dark', skin.dark);
             wrapper.style.setProperty('--board-bg', skin.bg);
         }
-        // Apply to chessground board via CSS custom properties
+        // Generate custom SVG checkerboard pattern with skin colors
         const cgBoard = document.querySelector('#cbc-board cg-board');
         if (cgBoard) {
-            cgBoard.style.setProperty('--cg-light', skin.light);
-            cgBoard.style.setProperty('--cg-dark', skin.dark);
+            const rows = [];
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    if ((r + c) % 2 === 1) {
+                        rows.push(`<rect x="${c}" y="${r}" width="1" height="1" fill="${skin.dark}"/>`);
+                    }
+                }
+            }
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="8" fill="${skin.light}"/>${rows.join('')}</svg>`;
+            const dataUrl = 'data:image/svg+xml;base64,' + btoa(svg);
+            cgBoard.style.backgroundColor = skin.light;
+            cgBoard.style.backgroundImage = `url("${dataUrl}")`;
         }
     },
 
@@ -462,17 +472,13 @@ const ChessBoardComponent = {
         const container = document.getElementById(this.containerEl);
         if (!container) return;
 
-        // Show start overlay inside the cbc-wrapper
-        const wrapper = container.querySelector('.cbc-wrapper');
-        if (!wrapper) return;
-
+        // Show start overlay as FIXED overlay — avoids parent height issues
         const overlay = document.createElement('div');
         overlay.id = 'cbc-start-overlay';
         overlay.style.cssText = `
-            position:absolute;top:0;left:0;right:0;bottom:0;z-index:200;
+            position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;
             background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);
             display:flex;align-items:center;justify-content:center;
-            border-radius:16px;
         `;
         overlay.innerHTML = `
             <div style="text-align:center;color:#fff;padding:32px;max-width:400px;">
@@ -496,8 +502,7 @@ const ChessBoardComponent = {
                 </button>
             </div>
         `;
-        wrapper.style.position = 'relative';
-        wrapper.appendChild(overlay);
+        document.body.appendChild(overlay);
     },
 
     _startFromOverlay() {
@@ -553,6 +558,12 @@ const ChessBoardComponent = {
         this.waitingForOpponent = false;
         this.selectedSquare = null;
         this.legalMoves = [];
+        this._madeWrongMove = false;
+        this._variationStack = [];
+        this._isInVariation = false;
+        this._isAutoPlaying = false;
+        this._currentAutoShapes = [];
+        this.lastOpponentMove = null; // Reset to avoid stale arrows from previous puzzle
 
         this.playerColor = this.detectPlayerColor(puzzle.fen);
 
@@ -603,7 +614,7 @@ const ChessBoardComponent = {
                 free: false,
                 color: this.playerColor,
                 dests: canMove ? this._getLegalDests() : new Map(),
-                showDests: true,
+                showDests: this.mode !== 'memory', // Hide legal move dots in memory mode
                 events: {
                     after: (orig, dest) => this._onPlayerMove(orig, dest)
                 }
@@ -636,6 +647,9 @@ const ChessBoardComponent = {
             },
             coordinates: true
         });
+
+        // Apply skin after board is ready
+        setTimeout(() => this._applyCurrentSkin(), 50);
 
         // MODE-SPECIFIC INIT
         if (this.mode === 'memory') {
@@ -714,6 +728,8 @@ const ChessBoardComponent = {
     // ═════════════════════════════════════════
     _startMemoryPhase(puzzle) {
         this.memoryPhase = 'memorize';
+        this._lockBoard(); // Prevent moves during memorization
+        this._clearAnnotations(); // Clear any leftover annotations from previous puzzle
 
         // If second mode, play opponent move first
         if (this.playMode === 'second') {
@@ -738,6 +754,7 @@ const ChessBoardComponent = {
         this.memoryPhase = 'hidden';
         // Hide pieces visually but keep board interactive
         this._setMemoryHidden(true);
+        this._unlockBoard(); // Allow moves now (pieces are hidden)
 
         // Show arrow for OPPONENT's next move (help the user know what happened)
         this._showOpponentArrow();
@@ -947,9 +964,11 @@ const ChessBoardComponent = {
                 this._setStatus('Đúng rồi! ✅', 'var(--success)');
                 this.playSound('correct');
                 this.waitingForOpponent = true;
+                this._lockBoard();
                 setTimeout(() => {
                     this.playOpponentMove();
                     this.waitingForOpponent = false;
+                    this._unlockBoard();
                     if (this.currentMoveIndex >= currentMoves.length) {
                         if (this._isInVariation) this._exitVariation();
                         else this._onPuzzleSolved();
@@ -1017,9 +1036,11 @@ const ChessBoardComponent = {
                         // Continue variation: play opponent's next move if any
                         if (variation.length > 1) {
                             this.waitingForOpponent = true;
+                            this._lockBoard();
                             setTimeout(() => {
                                 this.playOpponentMove();
                                 this.waitingForOpponent = false;
+                                this._unlockBoard();
                                 if (this.currentMoveIndex >= variation.length) {
                                     this._exitVariation();
                                 } else {
@@ -1056,9 +1077,11 @@ const ChessBoardComponent = {
                 this._setStatus('Đúng rồi! ✅', 'var(--success)');
                 this.playSound('correct');
                 this.waitingForOpponent = true;
+                this._lockBoard();
                 setTimeout(() => {
                     this.playOpponentMove();
                     this.waitingForOpponent = false;
+                    this._unlockBoard();
                     if (this.currentMoveIndex >= currentMoves.length) {
                         this._onPuzzleSolved();
                     } else {
@@ -1092,8 +1115,15 @@ const ChessBoardComponent = {
     /**
      * Auto-play a bad variation (refutation) at 2s/move, then restore
      */
-    _autoPlayBadVariation(variation, startFen) {
+    _autoPlayBadVariation(variation, restoreFen) {
+        // restoreFen = FEN after player's wrong move (game.fen() at call time)
+        // Save the FEN BEFORE the player's wrong move for restoration
+        const tempGame = new Chess(restoreFen);
+        try { tempGame.undo(); } catch (e) { }
+        const beforePlayerFen = tempGame.fen();
+
         this._isAutoPlaying = true;
+        this._lockBoard();
         const varInfo = document.getElementById('cbc-variation-info');
         const varText = document.getElementById('cbc-variation-text');
         if (varInfo && varText) {
@@ -1104,11 +1134,11 @@ const ChessBoardComponent = {
         let idx = 1; // First move already played by player
         const playNext = () => {
             if (idx >= variation.length || !this.sessionActive) {
-                // Done: restore position
+                // Done: restore position to before player's wrong move
                 this._isAutoPlaying = false;
-                this.game.load(startFen);
-                this.game.undo(); // Back to before player's move
+                this.game.load(beforePlayerFen);
                 this._updateBoard();
+                this._unlockBoard();
                 this._setStatus('↩ Quay lại tìm nước hay hơn!', '#3498db');
                 if (varInfo) varInfo.classList.add('hidden');
                 this._clearAnnotations();
@@ -1327,6 +1357,7 @@ const ChessBoardComponent = {
     // ═════════════════════════════════════════
     _endSession(reason) {
         this.sessionActive = false;
+        this._sessionEndReason = reason; // Track for _fireComplete
         clearInterval(this._timerInterval);
         if (this.memoryTimer) clearInterval(this.memoryTimer);
         document.body.classList.remove('cbc-memory-hidden');
@@ -1431,8 +1462,10 @@ const ChessBoardComponent = {
 
     _fireComplete() {
         if (this.onComplete) {
+            // Only mark as solved if session completed successfully (not focus_fail/memory_fail)
+            const isComplete = this._sessionEndReason === 'complete';
             this.onComplete({
-                solved: this.sessionPuzzlesSolved > 0,
+                solved: isComplete && this.sessionPuzzlesSolved > 0,
                 puzzlesSolved: this.sessionPuzzlesSolved,
                 puzzlesFailed: this.sessionPuzzlesFailed,
                 eloChange: this.sessionEloChange,
