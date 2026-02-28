@@ -3700,6 +3700,407 @@ body.cbc-memory-hidden .cg-wrap piece {
     color: #ef4444;
 }
 
+.tower-floor-badge--promote {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #fff;
+    animation: tower-promote-pulse 1.5s infinite;
+}
+
+@keyframes tower-promote-pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+    }
+}
+
+/* Promotable floor — golden glow */
+.tower-floor.promotable {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+    animation: tower-floor-glow 2s infinite;
+}
+
+@keyframes tower-floor-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 30px rgba(245, 158, 11, 0.4), 0 0 60px rgba(245, 158, 11, 0.15);
+    }
+}
+
+.tower-floor.promotable .tower-floor-number {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.tower-floor.promotable:hover {
+    transform: translateY(-3px);
+}
+
+/* Promote Panel */
+.tower-promote-panel {
+    text-align: center;
+    padding: 40px 24px;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%);
+    border-radius: 20px;
+    border: 2px solid #f59e0b;
+}
+
+.tower-promote-glow {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, transparent 50%);
+    animation: tower-promote-rotate 6s linear infinite;
+}
+
+@keyframes tower-promote-rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.tower-promote-icon {
+    font-size: 3.5rem;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+}
+
+.tower-promote-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin-top: 12px;
+    position: relative;
+    z-index: 1;
+    color: #92400e;
+}
+
+.tower-promote-floor {
+    font-size: 0.85rem;
+    color: #b45309;
+    font-weight: 600;
+    position: relative;
+    z-index: 1;
+}
+
+.tower-promote-desc {
+    font-size: 0.85rem;
+    color: #92400e;
+    margin: 12px 0;
+    position: relative;
+    z-index: 1;
+}
+
+.tower-promote-req {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 20px 0;
+    position: relative;
+    z-index: 1;
+}
+
+.tower-promote-req-item {
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.tower-promote-req-ok {
+    background: rgba(16, 185, 129, 0.15);
+    color: #059669;
+}
+
+.tower-promote-req-fail {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.tower-promote-btn {
+    position: relative;
+    z-index: 1;
+    padding: 14px 36px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    border: none;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #f59e0b, #d97706, #b45309);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(245, 158, 11, 0.4);
+    transition: all 0.3s;
+    letter-spacing: 0.5px;
+}
+
+.tower-promote-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(245, 158, 11, 0.5);
+}
+
+.tower-promote-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════
+   LEVEL-UP CEREMONY
+   ═══════════════════════════════════════════════ */
+.levelup-ceremony {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 99999;
+    background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.92) 0%, rgba(0, 0, 0, 0.97) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: levelup-fadein 0.5s ease;
+}
+
+@keyframes levelup-fadein {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.levelup-ceremony.levelup-fadeout {
+    animation: levelup-fadeout 0.5s ease forwards;
+}
+
+@keyframes levelup-fadeout {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+.levelup-content {
+    text-align: center;
+    position: relative;
+    z-index: 2;
+    animation: levelup-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes levelup-pop {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.levelup-badge-ring {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: conic-gradient(#f59e0b, #ef4444, #8b5cf6, #3b82f6, #10b981, #f59e0b);
+    animation: levelup-ring-spin 3s linear infinite;
+    padding: 4px;
+}
+
+@keyframes levelup-ring-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.levelup-badge {
+    width: 112px;
+    height: 112px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #1e1b4b, #0f172a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.5rem;
+    animation: levelup-badge-float 2s ease-in-out infinite;
+}
+
+@keyframes levelup-badge-float {
+
+    0%,
+    100% {
+        transform: translateY(0) rotate(0deg);
+    }
+
+    50% {
+        transform: translateY(-8px) rotate(5deg);
+    }
+}
+
+.levelup-label {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #fbbf24;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+}
+
+.levelup-rank {
+    font-size: 2rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b, #ef4444, #8b5cf6);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: levelup-gradient 3s ease infinite;
+    margin-bottom: 8px;
+}
+
+@keyframes levelup-gradient {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.levelup-floor {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 16px;
+}
+
+.levelup-message {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 24px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.levelup-ok-btn {
+    padding: 12px 40px;
+    font-size: 1rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(245, 158, 11, 0.4);
+    transition: all 0.3s;
+}
+
+.levelup-ok-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(245, 158, 11, 0.6);
+}
+
+/* Particles */
+.levelup-particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.levelup-particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fbbf24;
+    left: var(--x);
+    bottom: -20px;
+    animation: levelup-particle-rise var(--d) ease-out infinite;
+    opacity: 0;
+    transform: scale(var(--s));
+}
+
+.levelup-particle:nth-child(odd) {
+    background: #f59e0b;
+    width: 6px;
+    height: 6px;
+}
+
+.levelup-particle:nth-child(3n) {
+    background: #ef4444;
+    width: 10px;
+    height: 10px;
+}
+
+.levelup-particle:nth-child(5n) {
+    background: #8b5cf6;
+}
+
+.levelup-particle:nth-child(7n) {
+    background: #3b82f6;
+    width: 5px;
+    height: 5px;
+}
+
+@keyframes levelup-particle-rise {
+    0% {
+        transform: translateY(0) scale(var(--s));
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-100vh) scale(0);
+        opacity: 0;
+    }
+}
+
 .tower-floor-progressbar {
     position: absolute;
     bottom: 0;

@@ -1,12 +1,14 @@
 /**
- * Tower Page — Tháp Kỳ Vương (Full Page — Tower Climbing System)
+ * Tower Page — Tháp Kỳ Vương (Full Page — 18-Floor Tower Climbing System)
  * Each floor = a milestone/rank. Complete tasks + earn stars to climb higher.
- * Uses the same /gamification/milestones API as the old Mountain page.
+ * Floor 1 open by default. Floor 2-4: need stars. Floor 5+: need stars + membership.
+ * Uses the /gamification/milestones API.
  */
 const TowerPage = {
     _milestones: [],
     _currentMilestone: null,
     _userStars: 0,
+    _userRankLevel: 0,
     _hasMembership: false,
     _groupLabels: {
         tactics: { icon: '⚔️', label: 'Chiến thuật', color: '#e74c3c', bg: 'linear-gradient(135deg, #fee2e2, #fecaca)' },
@@ -43,6 +45,7 @@ const TowerPage = {
             const data = await API.get('/gamification/milestones');
             this._milestones = data.milestones;
             this._userStars = data.user_stars || 0;
+            this._userRankLevel = data.user_rank_level || 0;
 
             // Check membership
             try {
@@ -54,16 +57,22 @@ const TowerPage = {
             const starsEl = document.getElementById('tower-stars');
             if (starsEl) starsEl.textContent = `⭐ ${data.user_stars}`;
 
-            // Mark milestones as locked/unlocked
+            // Mark milestones lock state
             this._milestones.forEach((m, i) => {
-                const needsMembership = i >= 4;
-                m._locked = (this._userStars < m.stars_required) || (needsMembership && !this._hasMembership);
+                const needsMembership = m.sort_order >= 4;
+                const hasEnoughStars = this._userStars >= m.stars_required;
+                const isUnlocked = m.sort_order <= this._userRankLevel;
+
+                m._isUnlocked = isUnlocked;
+                m._canPromote = !isUnlocked && hasEnoughStars && !(needsMembership && !this._hasMembership);
+                m._locked = !isUnlocked && !m._canPromote;
                 m._needsMembership = needsMembership && !this._hasMembership;
+                m._needsMoreStars = !hasEnoughStars;
             });
 
-            // Find current milestone
-            this._currentMilestone = data.milestones.find(m => m.status !== 'completed' && !m._locked)
-                || data.milestones.find(m => !m._locked) || null;
+            // Find current milestone (the floor user is working on)
+            this._currentMilestone = this._milestones.find(m => m._isUnlocked && m.status !== 'completed')
+                || this._milestones.find(m => m._isUnlocked) || null;
 
             this.renderPage();
         } catch (err) {
@@ -91,16 +100,24 @@ const TowerPage = {
             const floorNum = this._milestones.length - idx;
             const isCurrent = this._currentMilestone && m.id === this._currentMilestone.id;
             const isCompleted = m.status === 'completed';
+            const isUnlocked = m._isUnlocked;
+            const canPromote = m._canPromote;
             const isLocked = m._locked;
 
             let stateClass = '';
             if (isCompleted) stateClass = 'completed';
             else if (isCurrent) stateClass = 'current';
+            else if (canPromote) stateClass = 'promotable';
             else if (isLocked) stateClass = 'locked';
+
+            // Format stars
+            const starsStr = m.stars_required >= 1000
+                ? (m.stars_required / 1000).toFixed(m.stars_required % 1000 === 0 ? 0 : 1) + 'K'
+                : m.stars_required;
 
             return `
                             <div class="tower-floor-wrapper">
-                                <div class="tower-connector ${isCompleted ? 'completed' : ''}"></div>
+                                <div class="tower-connector ${isCompleted || isUnlocked ? 'completed' : ''}"></div>
                                 <div class="tower-floor ${stateClass}" 
                                      onclick="TowerPage.selectFloor(${m.id})"
                                      data-floor-id="${m.id}">
@@ -108,16 +125,17 @@ const TowerPage = {
                                     <div class="tower-floor-icon">${isLocked ? '🔒' : m.icon}</div>
                                     <div class="tower-floor-info">
                                         <div class="tower-floor-name">${m.title}</div>
-                                        <div class="tower-floor-stars">⭐ ${m.stars_required} sao</div>
-                                        ${isCurrent && !isLocked ? `<div class="tower-floor-progress-text">${Math.round(m.progress)}% hoàn thành</div>` : ''}
+                                        <div class="tower-floor-stars">⭐ ${starsStr} sao</div>
+                                        ${isCurrent && isUnlocked ? `<div class="tower-floor-progress-text">${Math.round(m.progress)}% hoàn thành</div>` : ''}
                                     </div>
                                     <div class="tower-floor-status">
                                         ${isCompleted ? '<span class="tower-floor-badge tower-floor-badge--done">✅ Đã vượt</span>' : ''}
-                                        ${isCurrent && !isLocked ? '<span class="tower-floor-badge tower-floor-badge--current">🏗️ Đang leo</span>' : ''}
+                                        ${isCurrent && isUnlocked ? '<span class="tower-floor-badge tower-floor-badge--current">🏗️ Đang leo</span>' : ''}
+                                        ${canPromote ? '<span class="tower-floor-badge tower-floor-badge--promote">🎯 Sẵn sàng!</span>' : ''}
                                         ${isLocked && m._needsMembership ? '<span class="tower-floor-badge tower-floor-badge--locked">👑 Membership</span>' : ''}
-                                        ${isLocked && !m._needsMembership ? '<span class="tower-floor-badge tower-floor-badge--locked">🔒 Chưa đủ sao</span>' : ''}
+                                        ${isLocked && !m._needsMembership && m._needsMoreStars ? '<span class="tower-floor-badge tower-floor-badge--locked">🔒 Chưa đủ sao</span>' : ''}
                                     </div>
-                                    ${isCurrent && !isLocked ? `
+                                    ${isCurrent && isUnlocked ? `
                                     <div class="tower-floor-progressbar">
                                         <div class="tower-floor-progressbar-fill" style="width:${Math.round(m.progress)}%"></div>
                                     </div>
@@ -149,21 +167,37 @@ const TowerPage = {
     async selectFloor(milestoneId) {
         const m = this._milestones.find(m => m.id === milestoneId);
         if (!m) return;
+
+        // If promotable — show level-up option in detail panel
+        if (m._canPromote) {
+            this._currentMilestone = m;
+            this._showPromotePanel(m);
+
+            // Update floor active state visually
+            document.querySelectorAll('.tower-floor').forEach(f => {
+                if (!f.classList.contains('completed') && !f.classList.contains('promotable')) {
+                    f.classList.remove('current');
+                }
+            });
+            return;
+        }
+
         if (m._locked) {
             if (m._needsMembership) {
                 Toast.warning('👑 Tầng này yêu cầu Membership! Mua tại Chợ Phiên → 💎 Nạp Tiền');
             } else {
-                Toast.warning(`🔒 Cần ${m.stars_required}⭐ để mở tầng này! Bạn có ${this._userStars}⭐`);
+                Toast.warning(`🔒 Cần ${m.stars_required.toLocaleString()}⭐ để mở tầng này! Bạn có ${this._userStars.toLocaleString()}⭐`);
             }
             return;
         }
+
         this._currentMilestone = m;
 
         // Update floor active state visually
         document.querySelectorAll('.tower-floor').forEach(f => {
             f.classList.remove('current');
-            if (f.classList.contains('completed')) return;
-            f.classList.add('locked');
+            if (f.classList.contains('completed') || f.classList.contains('promotable')) return;
+            if (!f.classList.contains('locked')) f.classList.add('locked');
         });
         const activeFloor = document.querySelector(`[data-floor-id="${milestoneId}"]`);
         if (activeFloor && !activeFloor.classList.contains('completed')) {
@@ -172,6 +206,96 @@ const TowerPage = {
         }
 
         this.loadFloorTasks(milestoneId);
+    },
+
+    _showPromotePanel(m) {
+        const detail = document.getElementById('tower-detail');
+        if (!detail) return;
+
+        const floorNum = m.sort_order + 1;
+        detail.innerHTML = `
+            <div class="tower-promote-panel">
+                <div class="tower-promote-glow"></div>
+                <div class="tower-promote-icon">${m.icon}</div>
+                <h2 class="tower-promote-title">${m.title}</h2>
+                <div class="tower-promote-floor">Tầng ${floorNum}</div>
+                <div class="tower-promote-desc">${m.description || ''}</div>
+                <div class="tower-promote-req">
+                    <div class="tower-promote-req-item tower-promote-req-ok">
+                        ✅ ${m.stars_required.toLocaleString()} ⭐ — Đủ sao!
+                    </div>
+                    ${m.sort_order >= 4 ? `
+                    <div class="tower-promote-req-item ${this._hasMembership ? 'tower-promote-req-ok' : 'tower-promote-req-fail'}">
+                        ${this._hasMembership ? '✅' : '❌'} 👑 Membership — ${this._hasMembership ? 'Đã có!' : 'Chưa có'}
+                    </div>
+                    ` : ''}
+                </div>
+                <button class="tower-promote-btn" onclick="TowerPage.requestLevelUp(${m.sort_order})">
+                    🎯 Yêu Cầu Thăng Cấp
+                </button>
+            </div>
+        `;
+
+        if (window.innerWidth < 768) {
+            detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    },
+
+    async requestLevelUp(targetFloor) {
+        try {
+            const btn = document.querySelector('.tower-promote-btn');
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang xử lý...'; }
+
+            const result = await API.post('/gamification/request-levelup', { target_floor: targetFloor });
+
+            if (result.success) {
+                // Show epic ceremony!
+                this._showLevelUpCeremony(result);
+            }
+        } catch (err) {
+            Toast.error(err.message || err.error || 'Lỗi thăng cấp');
+            const btn = document.querySelector('.tower-promote-btn');
+            if (btn) { btn.disabled = false; btn.textContent = '🎯 Yêu Cầu Thăng Cấp'; }
+        }
+    },
+
+    _showLevelUpCeremony(result) {
+        const existing = document.getElementById('levelup-ceremony');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'levelup-ceremony';
+        overlay.className = 'levelup-ceremony';
+        overlay.innerHTML = `
+            <div class="levelup-particles">
+                ${Array.from({ length: 30 }, (_, i) => `<div class="levelup-particle" style="--i:${i};--x:${Math.random() * 100}vw;--d:${Math.random() * 3 + 2}s;--s:${Math.random() * 0.5 + 0.5}"></div>`).join('')}
+            </div>
+            <div class="levelup-content">
+                <div class="levelup-badge-ring">
+                    <div class="levelup-badge">${result.icon || '🏰'}</div>
+                </div>
+                <div class="levelup-label">⚡ THĂNG CẤP ⚡</div>
+                <div class="levelup-rank">${result.new_rank}</div>
+                <div class="levelup-floor">Tầng ${result.new_level + 1}</div>
+                <div class="levelup-message">${result.message}</div>
+                <button class="levelup-ok-btn" onclick="TowerPage._dismissCeremony()">✨ Tiếp Tục ✨</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Auto dismiss after 6 seconds
+        setTimeout(() => this._dismissCeremony(), 6000);
+    },
+
+    _dismissCeremony() {
+        const overlay = document.getElementById('levelup-ceremony');
+        if (overlay) {
+            overlay.classList.add('levelup-fadeout');
+            setTimeout(() => overlay.remove(), 500);
+        }
+        // Reload tower data
+        this.loadData();
+        if (typeof HomePage !== 'undefined') HomePage.refreshStats?.();
     },
 
     async loadFloorTasks(milestoneId) {
@@ -273,7 +397,6 @@ const TowerPage = {
             const data = await API.get(`/puzzles/sets/${puzzleSetId}`);
             const solveMode = data.puzzle_set?.solve_mode || 'basic';
 
-            // Use fullscreen immersive mode — no modal needed
             ChessBoardComponent.mount({
                 pgnSource: data,
                 mode: solveMode,
@@ -303,7 +426,6 @@ const TowerPage = {
         try {
             const result = await API.post(`/gamification/milestones/${taskId}/complete`);
             this._showRewardPopup(result);
-            // Reload data after popup
             setTimeout(async () => {
                 await this.loadData();
                 if (typeof HomePage !== 'undefined') HomePage.refreshStats?.();

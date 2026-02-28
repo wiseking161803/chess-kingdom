@@ -220,30 +220,82 @@ router.post('/milestones/:taskId/complete', authenticate, async (req, res) => {
 });
 
 /**
- * POST /api/gamification/request-levelup — Request rank up
+ * POST /api/gamification/request-levelup — Self-service auto-unlock
+ * Checks stars + membership, then promotes user immediately
  */
 router.post('/request-levelup', authenticate, async (req, res) => {
     try {
-        const { milestone_title } = req.body;
         const userId = req.user.id;
+        const { target_floor } = req.body; // sort_order of the floor to unlock
 
-        // Check if already pending
-        const [existing] = await db.query(
-            'SELECT id FROM level_up_requests WHERE user_id = ? AND status = ?',
-            [userId, 'pending']
+        // Get user data
+        const [userRows] = await db.query('SELECT rank_level FROM users WHERE id = ?', [userId]);
+        const currentLevel = userRows[0]?.rank_level || 0;
+
+        // Get target milestone
+        const [milestones] = await db.query(
+            'SELECT * FROM milestones WHERE sort_order = ? AND is_active = 1',
+            [target_floor]
         );
-        if (existing.length > 0) {
-            return res.status(400).json({ error: 'Bạn đã có yêu cầu đang chờ xử lý' });
+        if (milestones.length === 0) {
+            return res.status(404).json({ error: 'Không tìm thấy tầng này' });
+        }
+        const milestone = milestones[0];
+
+        // Must be exactly the next floor
+        if (target_floor !== currentLevel + 1) {
+            return res.status(400).json({ error: 'Bạn chỉ có thể thăng lên tầng tiếp theo' });
         }
 
+        // Check stars
+        const [currencies] = await db.query(
+            'SELECT knowledge_stars FROM user_currencies WHERE user_id = ?', [userId]
+        );
+        const userStars = currencies[0]?.knowledge_stars || 0;
+        if (userStars < milestone.stars_required) {
+            return res.status(400).json({
+                error: `Cần ${milestone.stars_required}⭐ để mở tầng này. Bạn có ${userStars}⭐`
+            });
+        }
+
+        // Check membership for floor 5+ (sort_order >= 4)
+        if (target_floor >= 4) {
+            try {
+                const [memRows] = await db.query(
+                    "SELECT id FROM user_inventory WHERE user_id = ? AND item_type = 'membership' AND expires_at > NOW()",
+                    [userId]
+                );
+                if (memRows.length === 0) {
+                    return res.status(403).json({
+                        error: '👑 Tầng này yêu cầu Membership! Mua tại Chợ Phiên.',
+                        needs_membership: true
+                    });
+                }
+            } catch (e) {
+                // If table doesn't exist, treat as no membership
+                return res.status(403).json({
+                    error: '👑 Tầng này yêu cầu Membership!',
+                    needs_membership: true
+                });
+            }
+        }
+
+        // All checks passed — promote user!
         await db.query(
-            'INSERT INTO level_up_requests (user_id, requested_milestone) VALUES (?,?)',
-            [userId, milestone_title]
+            'UPDATE users SET rank_level = ?, current_rank = ? WHERE id = ?',
+            [target_floor, milestone.title, userId]
         );
 
-        res.json({ message: 'Yêu cầu thăng cấp đã được gửi! Vui lòng chờ admin phê duyệt.' });
+        res.json({
+            success: true,
+            message: `🎉 Chúc mừng! Bạn đã thăng lên "${milestone.title}"!`,
+            new_rank: milestone.title,
+            new_level: target_floor,
+            icon: milestone.icon
+        });
     } catch (err) {
-        res.status(500).json({ error: 'Lỗi gửi yêu cầu' });
+        console.error('Level up error:', err);
+        res.status(500).json({ error: 'Lỗi thăng cấp' });
     }
 });
 
