@@ -820,11 +820,11 @@ const ChessBoardComponent = {
     },
 
     _showOpponentArrow() {
-        // Show flash/glow on squares for the OPPONENT's last move
+        // Show arrow for the OPPONENT's last move
         this._clearAnnotations();
 
         if (this.lastOpponentMove) {
-            this._flashMoveSquares(this.lastOpponentMove.from, this.lastOpponentMove.to);
+            this._drawArrow(this.lastOpponentMove.from, this.lastOpponentMove.to, 'rgba(142, 68, 173, 0.85)');
         } else if (this.currentMoveIndex > 0) {
             const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
             const prevNode = this.getMoveNode(puzzle, this.currentMoveIndex - 1);
@@ -834,7 +834,7 @@ const ChessBoardComponent = {
                     const tempGame = new Chess(prevFen);
                     try {
                         const result = tempGame.move(prevNode.move);
-                        if (result) this._flashMoveSquares(result.from, result.to);
+                        if (result) this._drawArrow(result.from, result.to, 'rgba(142, 68, 173, 0.85)');
                     } catch (e) { }
                 }
             }
