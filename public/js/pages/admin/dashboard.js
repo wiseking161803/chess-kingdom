@@ -287,6 +287,15 @@ const AdminPage = {
     _puzzleGroupFilter: '',
     _puzzleSearch: '',
 
+    _themeLabel(theme) {
+        const labels = {
+            candy_land: '🍭 Candy Land', enchanted_forest: '🌳 Rừng Ma Thuật',
+            ocean_adventure: '🐠 Đại Dương', space_galaxy: '🚀 Vũ Trụ',
+            medieval_castle: '🏰 Lâu Đài', classic: '♟️ Cổ Điển'
+        };
+        return labels[theme] || theme;
+    },
+
     async loadPuzzles(container) {
         try {
             const data = await API.get('/puzzles/sets');
@@ -330,6 +339,7 @@ const AdminPage = {
                             </div>
                             <div class="text-small text-muted">${s.puzzle_count} bài • ${s.difficulty}</div>
                             <div class="text-xs" style="margin-top:4px;color:var(--primary);">${playLabels[s.play_mode] || '🏁 Đi trước'} • ${modeLabels[s.solve_mode] || '📋 Cơ Bản'}</div>
+                            ${s.theme ? `<div class="text-xs mt-1"><span style="background:rgba(233,121,160,0.15);padding:2px 8px;border-radius:10px;font-weight:600;">🎨 ${AdminPage._themeLabel(s.theme)}</span></div>` : ''}
                             ${s.group_name ? `<div class="text-xs mt-1"><span style="background:rgba(108,92,231,0.15);padding:2px 8px;border-radius:10px;font-weight:600;">📁 ${s.group_name}</span></div>` : ''}
                             <div class="text-xs text-muted mt-1">${new Date(s.created_at).toLocaleDateString('vi-VN')}</div>
                             <div style="display:flex;gap:6px;margin-top:8px;">
@@ -496,6 +506,18 @@ const AdminPage = {
                                 </select>
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">🎨 Theme bàn cờ</label>
+                            <select class="form-select" id="ep-theme">
+                                <option value="" ${!s.theme ? 'selected' : ''}>-- Mặc định --</option>
+                                <option value="candy_land" ${s.theme === 'candy_land' ? 'selected' : ''}>🍭 Candy Land</option>
+                                <option value="enchanted_forest" ${s.theme === 'enchanted_forest' ? 'selected' : ''}>🌳 Rừng Ma Thuật</option>
+                                <option value="ocean_adventure" ${s.theme === 'ocean_adventure' ? 'selected' : ''}>🐠 Đại Dương</option>
+                                <option value="space_galaxy" ${s.theme === 'space_galaxy' ? 'selected' : ''}>🚀 Vũ Trụ</option>
+                                <option value="medieval_castle" ${s.theme === 'medieval_castle' ? 'selected' : ''}>🏰 Lâu Đài</option>
+                                <option value="classic" ${s.theme === 'classic' ? 'selected' : ''}>♟️ Cổ Điển</option>
+                            </select>
+                        </div>
                         <button type="submit" class="btn btn-primary" style="width:100%;">💾 Lưu</button>
                     </form>
                 `
@@ -513,7 +535,8 @@ const AdminPage = {
                         difficulty: document.getElementById('ep-diff').value,
                         play_mode: document.getElementById('ep-play').value,
                         solve_mode: document.getElementById('ep-solve').value,
-                        group_name: groupVal
+                        group_name: groupVal,
+                        theme: document.getElementById('ep-theme').value || null
                     });
                     Toast.success('Đã cập nhật!');
                     Modal.hide('edit-puzzle-modal');
@@ -583,6 +606,18 @@ const AdminPage = {
                             </select>
                         </div>
                         <div class="form-group">
+                            <label class="form-label">🎨 Theme bàn cờ</label>
+                            <select class="form-select" id="pgn-theme">
+                                <option value="">-- Mặc định --</option>
+                                <option value="candy_land">🍭 Candy Land</option>
+                                <option value="enchanted_forest">🌳 Rừng Ma Thuật</option>
+                                <option value="ocean_adventure">🐠 Đại Dương</option>
+                                <option value="space_galaxy">🚀 Vũ Trụ</option>
+                                <option value="medieval_castle">🏰 Lâu Đài</option>
+                                <option value="classic">♟️ Cổ Điển</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label class="form-label">File PGN</label>
                             <input type="file" class="form-input" id="pgn-file" accept=".pgn" required>
                         </div>
@@ -609,6 +644,7 @@ const AdminPage = {
                     formData.append('play_mode', document.getElementById('pgn-play-mode').value);
                     formData.append('solve_mode', document.getElementById('pgn-solve-mode').value);
                     formData.append('group_name', groupVal);
+                    formData.append('theme', document.getElementById('pgn-theme').value || '');
                     formData.append('pgn_file', document.getElementById('pgn-file').files[0]);
 
                     const result = await API.upload('/puzzles/sets', formData);

@@ -486,6 +486,12 @@ async function migrate() {
     `);
     console.log('  ✅ Created elo_history table');
 
+    // Add theme to puzzle_sets
+    try {
+        await conn.query(`ALTER TABLE puzzle_sets ADD COLUMN theme VARCHAR(50) DEFAULT NULL`);
+        console.log('  ✅ Added theme to puzzle_sets');
+    } catch (e) { if (e.code !== 'ER_DUP_FIELDNAME') throw e; }
+
     console.log('✅ All tables created successfully!');
     await conn.end();
 }

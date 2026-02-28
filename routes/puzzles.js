@@ -465,8 +465,8 @@ router.post('/sets', authenticate, requireAdmin, upload.single('pgn_file'), asyn
 
         // Create puzzle set
         const [result] = await db.query(
-            'INSERT INTO puzzle_sets (name, description, difficulty, play_mode, solve_mode, puzzle_count, pgn_content, created_by, group_name) VALUES (?,?,?,?,?,?,?,?,?)',
-            [name, description || null, difficulty || 'beginner', mode, sMode, puzzles.length, pgnContent, req.user.id, req.body.group_name || null]
+            'INSERT INTO puzzle_sets (name, description, difficulty, play_mode, solve_mode, puzzle_count, pgn_content, created_by, group_name, theme) VALUES (?,?,?,?,?,?,?,?,?,?)',
+            [name, description || null, difficulty || 'beginner', mode, sMode, puzzles.length, pgnContent, req.user.id, req.body.group_name || null, req.body.theme || null]
         );
 
         const setId = result.insertId;
@@ -499,7 +499,7 @@ router.get('/sets', authenticate, async (req, res) => {
         try {
             [sets] = await db.query(`
                 SELECT ps.id, ps.name, ps.group_name, ps.description, ps.difficulty, ps.play_mode,
-                       ps.solve_mode, ps.puzzle_count, ps.is_active, ps.created_at,
+                       ps.solve_mode, ps.puzzle_count, ps.is_active, ps.created_at, ps.theme,
                        u.display_name as created_by_name
                 FROM puzzle_sets ps
                 LEFT JOIN users u ON ps.created_by = u.id
@@ -510,7 +510,7 @@ router.get('/sets', authenticate, async (req, res) => {
             // Fallback if group_name column doesn't exist yet
             [sets] = await db.query(`
                 SELECT ps.id, ps.name, NULL as group_name, ps.description, ps.difficulty, ps.play_mode,
-                       ps.solve_mode, ps.puzzle_count, ps.is_active, ps.created_at,
+                       ps.solve_mode, ps.puzzle_count, ps.is_active, ps.created_at, ps.theme,
                        u.display_name as created_by_name
                 FROM puzzle_sets ps
                 LEFT JOIN users u ON ps.created_by = u.id
@@ -810,6 +810,7 @@ router.put('/sets/:id', authenticate, requireAdmin, async (req, res) => {
         if (play_mode !== undefined) { fields.push('play_mode = ?'); values.push(play_mode); }
         if (solve_mode !== undefined) { fields.push('solve_mode = ?'); values.push(solve_mode); }
         if (group_name !== undefined) { fields.push('group_name = ?'); values.push(group_name || null); }
+        if (req.body.theme !== undefined) { fields.push('theme = ?'); values.push(req.body.theme || null); }
 
         if (fields.length === 0) return res.status(400).json({ error: 'Không có gì để cập nhật' });
 

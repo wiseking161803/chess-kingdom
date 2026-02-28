@@ -2649,6 +2649,300 @@ textarea {
     z-index: 150;
 }
 
+/* ═══════════════════════════════════════════════
+   BOARD THEMES — Chessworld.io inspired
+   ═══════════════════════════════════════════════ */
+
+/* Themed wrapper — shows background image */
+.cbc-wrapper {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: background 0.3s ease;
+}
+
+.cbc-wrapper.cbc-themed::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: var(--theme-bg);
+    background-size: cover;
+    background-position: center;
+    opacity: 0.35;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.cbc-wrapper.cbc-themed>* {
+    position: relative;
+    z-index: 1;
+}
+
+/* Board frame/border */
+.cbc-board-area {
+    position: relative;
+    border: 4px solid var(--board-border, #8b6914);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3),
+        inset 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+/* ═══════════════════════════════════════════════
+   FULLSCREEN IMMERSIVE MODE
+   ═══════════════════════════════════════════════ */
+
+body.cbc-no-scroll {
+    overflow: hidden !important;
+}
+
+.cbc-fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9990;
+    background: #1a1a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: cbc-fs-fadein 0.3s ease;
+}
+
+@keyframes cbc-fs-fadein {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.cbc-fs-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+/* Fullscreen wrapper — background fills viewport */
+.cbc-fullscreen-overlay .cbc-wrapper {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.cbc-fullscreen-overlay .cbc-wrapper.cbc-themed::before {
+    opacity: 1;
+    /* Full opacity in fullscreen mode */
+    z-index: 0;
+}
+
+.cbc-fullscreen-overlay .cbc-wrapper.cbc-themed>* {
+    z-index: 1;
+    position: relative;
+}
+
+.cbc-fullscreen-overlay .cbc-session-bar {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    border-radius: 0;
+    padding: 8px 16px;
+    z-index: 2;
+}
+
+.cbc-fullscreen-overlay .cbc-layout {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 16px;
+    min-height: 0;
+}
+
+.cbc-fullscreen-overlay .cbc-board-area {
+    width: min(65vh, 500px);
+    flex-shrink: 0;
+    border: 5px solid var(--board-border, #8b6914);
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5),
+        0 0 60px rgba(0, 0, 0, 0.3);
+}
+
+.cbc-fullscreen-overlay .cbc-info-panel {
+    max-width: 280px;
+    flex-shrink: 0;
+}
+
+.cbc-fullscreen-overlay .cbc-info-panel .card {
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    color: #fff;
+}
+
+.cbc-fullscreen-overlay .cbc-info-panel .card-header {
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.cbc-fullscreen-overlay .cbc-info-panel .text-muted {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.cbc-fullscreen-overlay .cbc-status {
+    color: #fff;
+}
+
+/* Close button */
+.cbc-fs-close {
+    position: fixed;
+    top: 12px;
+    right: 16px;
+    z-index: 9999;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    font-size: 1.6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    line-height: 1;
+}
+
+.cbc-fs-close:hover {
+    background: rgba(231, 76, 60, 0.8);
+    transform: scale(1.1);
+}
+
+/* Mobile fullscreen — show background around board */
+@media (max-width: 768px) {
+    .cbc-fullscreen-overlay .cbc-layout {
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px 12px;
+        justify-content: center;
+    }
+
+    .cbc-fullscreen-overlay .cbc-board-area {
+        width: min(72vw, 340px);
+    }
+
+    .cbc-fullscreen-overlay .cbc-session-bar {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+
+    .cbc-fullscreen-overlay .cbc-info-panel {
+        max-width: 85vw;
+        width: auto;
+    }
+
+    .cbc-fullscreen-overlay .cbc-info-panel .card {
+        padding: 8px 12px;
+    }
+
+    .cbc-fullscreen-overlay .cbc-info-panel .card-header {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+
+    .cbc-fullscreen-overlay .cbc-info-panel .card-body {
+        padding: 8px;
+    }
+
+    .cbc-fullscreen-overlay .cbc-status {
+        font-size: 0.85rem;
+    }
+}
+
+/* Very small screens — even more compact */
+@media (max-width: 400px) {
+    .cbc-fullscreen-overlay .cbc-board-area {
+        width: min(65vw, 280px);
+    }
+
+    .cbc-fullscreen-overlay .cbc-layout {
+        padding: 12px 8px;
+        gap: 8px;
+    }
+}
+
+/* Theme Selector Modal */
+.cbc-theme-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.cbc-theme-option {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--bg-card);
+    position: relative;
+}
+
+.cbc-theme-option:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.cbc-theme-option.active {
+    border-color: var(--success);
+    background: var(--bg-success, rgba(16, 185, 129, 0.1));
+}
+
+.cbc-theme-preview {
+    width: 100%;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.cbc-theme-mini-board {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.cbc-theme-info {
+    text-align: center;
+}
+
+.cbc-theme-check {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 1rem;
+}
+
 /* Chessground board sizing — CRITICAL: chessground requires explicit dimensions */
 #cbc-board {
     width: 100%;

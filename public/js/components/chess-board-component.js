@@ -11,14 +11,60 @@
  */
 const ChessBoardComponent = {
     // ═════════════════════════════════════════
-    // BOARD SKINS — Color psychology optimized
+    // BOARD THEMES — Inspired by chessworld.io
+    // Each theme: background image + board colors + border
     // ═════════════════════════════════════════
-    BOARD_SKINS: {
-        memory: { name: '🧠 Trí nhớ', desc: 'Tông nóng hỗ trợ nhận dạng mẫu', light: '#f0d9b5', dark: '#b58863', bg: '#2c1f14' },
-        focus: { name: '🎯 Tập trung', desc: 'Tông lạnh giảm mỏi mắt', light: '#dee3e6', dark: '#6b8cae', bg: '#1a2332' },
-        speed: { name: '⚡ Tốc độ', desc: 'Tương phản cao, quét nhanh', light: '#eeeed2', dark: '#769656', bg: '#302e2b' }
+    BOARD_THEMES: {
+        candy_land: {
+            name: '🍭 Candy Land',
+            desc: 'Vùng đất kẹo ngọt',
+            light: '#f0e6ff', dark: '#c9a0dc',
+            border: '#e879a0',
+            bg: '/img/themes/candy_land.png',
+            wrapperBg: 'linear-gradient(135deg, #fce4ec, #f3e5f5)'
+        },
+        enchanted_forest: {
+            name: '🌳 Rừng Ma Thuật',
+            desc: 'Khu rừng phép thuật',
+            light: '#e8f5e9', dark: '#66bb6a',
+            border: '#388e3c',
+            bg: '/img/themes/enchanted_forest.png',
+            wrapperBg: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)'
+        },
+        ocean_adventure: {
+            name: '🐠 Đại Dương',
+            desc: 'Phiêu lưu dưới biển',
+            light: '#e0f7fa', dark: '#4dd0e1',
+            border: '#00838f',
+            bg: '/img/themes/ocean_adventure.png',
+            wrapperBg: 'linear-gradient(135deg, #e0f7fa, #b2ebf2)'
+        },
+        space_galaxy: {
+            name: '🚀 Vũ Trụ',
+            desc: 'Khám phá thiên hà',
+            light: '#e8eaf6', dark: '#7c4dff',
+            border: '#4527a0',
+            bg: '/img/themes/space_galaxy.png',
+            wrapperBg: 'linear-gradient(135deg, #1a1a2e, #16213e)'
+        },
+        medieval_castle: {
+            name: '🏰 Lâu Đài',
+            desc: 'Vương quốc trung cổ',
+            light: '#fff8e1', dark: '#ffb74d',
+            border: '#e65100',
+            bg: '/img/themes/medieval_castle.png',
+            wrapperBg: 'linear-gradient(135deg, #fff8e1, #ffe0b2)'
+        },
+        classic: {
+            name: '♟️ Cổ Điển',
+            desc: 'Bàn cờ truyền thống',
+            light: '#f0d9b5', dark: '#b58863',
+            border: '#8b6914',
+            bg: null,
+            wrapperBg: 'linear-gradient(135deg, #2c1f14, #1a1410)'
+        }
     },
-    currentSkin: null,
+    currentTheme: null,
 
     // Piece image preload cache
     _pieceImagesLoaded: false,
@@ -226,68 +272,84 @@ const ChessBoardComponent = {
     // ═════════════════════════════════════════
     // BOARD SKINS
     // ═════════════════════════════════════════
-    applySkin(skinKey) {
-        const skin = this.BOARD_SKINS[skinKey];
-        if (!skin) return;
-        this.currentSkin = skinKey;
-        localStorage.setItem('chess_board_skin', skinKey);
+    applySkin(themeKey) {
+        const theme = this.BOARD_THEMES[themeKey];
+        if (!theme) return;
+        this.currentTheme = themeKey;
+        localStorage.setItem('chess_board_theme', themeKey);
+
+        // Apply wrapper background
         const wrapper = document.querySelector('.cbc-wrapper');
         if (wrapper) {
-            wrapper.style.setProperty('--board-light', skin.light);
-            wrapper.style.setProperty('--board-dark', skin.dark);
-            wrapper.style.setProperty('--board-bg', skin.bg);
+            wrapper.style.background = theme.wrapperBg;
+            // Set background image if theme has one
+            if (theme.bg) {
+                wrapper.classList.add('cbc-themed');
+                wrapper.style.setProperty('--theme-bg', `url("${theme.bg}")`);
+            } else {
+                wrapper.classList.remove('cbc-themed');
+                wrapper.style.removeProperty('--theme-bg');
+            }
+            wrapper.style.setProperty('--board-border', theme.border);
         }
-        // Generate custom SVG checkerboard pattern with skin colors
+
+        // Generate custom SVG checkerboard pattern
         const cgBoard = document.querySelector('#cbc-board cg-board');
         if (cgBoard) {
             const rows = [];
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
                     if ((r + c) % 2 === 1) {
-                        rows.push(`<rect x="${c}" y="${r}" width="1" height="1" fill="${skin.dark}"/>`);
+                        rows.push(`<rect x="${c}" y="${r}" width="1" height="1" fill="${theme.dark}"/>`);
                     }
                 }
             }
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="8" fill="${skin.light}"/>${rows.join('')}</svg>`;
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="8" fill="${theme.light}"/>${rows.join('')}</svg>`;
             const dataUrl = 'data:image/svg+xml;base64,' + btoa(svg);
-            cgBoard.style.backgroundColor = skin.light;
+            cgBoard.style.backgroundColor = theme.light;
             cgBoard.style.backgroundImage = `url("${dataUrl}")`;
         }
     },
 
     _applyCurrentSkin() {
-        // Auto-select skin based on mode, or use saved preference
-        const saved = localStorage.getItem('chess_board_skin');
-        const modeDefaults = { memory: 'memory', focus: 'focus', basic: 'speed' };
-        const skinKey = saved || modeDefaults[this.mode] || 'speed';
-        this.applySkin(skinKey);
+        // Priority: puzzle set theme > user saved theme > default
+        const themeKey = this._puzzleTheme || localStorage.getItem('chess_board_theme') || 'enchanted_forest';
+        this.applySkin(themeKey);
     },
 
     showSkinSelector() {
-        const items = Object.entries(this.BOARD_SKINS).map(([key, skin]) => {
-            const isActive = this.currentSkin === key;
+        const items = Object.entries(this.BOARD_THEMES).map(([key, theme]) => {
+            const isActive = this.currentTheme === key;
+            const bgStyle = theme.bg
+                ? `background-image:url('${theme.bg}');background-size:cover;background-position:center;`
+                : `background:${theme.wrapperBg};`;
             return `
-            <div class="cbc-skin-option ${isActive ? 'active' : ''}" onclick="ChessBoardComponent.applySkin('${key}'); ChessBoardComponent.showSkinSelector();">
-                <div class="cbc-skin-preview">
-                    <div class="cbc-skin-mini" style="display:grid;grid-template-columns:1fr 1fr;width:40px;height:40px;border-radius:4px;overflow:hidden;">
-                        <div style="background:${skin.light}"></div>
-                        <div style="background:${skin.dark}"></div>
-                        <div style="background:${skin.dark}"></div>
-                        <div style="background:${skin.light}"></div>
+            <div class="cbc-theme-option ${isActive ? 'active' : ''}" onclick="ChessBoardComponent.applySkin('${key}'); ChessBoardComponent.showSkinSelector();">
+                <div class="cbc-theme-preview" style="${bgStyle}">
+                    <div class="cbc-theme-mini-board" style="display:grid;grid-template-columns:repeat(4,1fr);width:32px;height:32px;border-radius:3px;overflow:hidden;border:2px solid ${theme.border};">
+                        <div style="background:${theme.light}"></div>
+                        <div style="background:${theme.dark}"></div>
+                        <div style="background:${theme.dark}"></div>
+                        <div style="background:${theme.light}"></div>
+                        <div style="background:${theme.dark}"></div>
+                        <div style="background:${theme.light}"></div>
+                        <div style="background:${theme.light}"></div>
+                        <div style="background:${theme.dark}"></div>
                     </div>
                 </div>
-                <div>
-                    <div style="font-weight:600;">${skin.name}</div>
-                    <div class="text-small text-muted">${skin.desc}</div>
+                <div class="cbc-theme-info">
+                    <div style="font-weight:600;font-size:0.9rem;">${theme.name}</div>
+                    <div class="text-small text-muted">${theme.desc}</div>
                 </div>
+                ${isActive ? '<div class="cbc-theme-check">✅</div>' : ''}
             </div>`;
         }).join('');
 
         Modal.create({
             id: 'cbc-skin-modal',
-            title: '🎨 Giao Diện Bàn Cờ',
+            title: '🎨 Chọn Theme Bàn Cờ',
             icon: '🎨',
-            content: `<div class="cbc-skin-list">${items}</div>
+            content: `<div class="cbc-theme-list">${items}</div>
                 <button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px;" onclick="Modal.hide('cbc-skin-modal')">✅ Đóng</button>`
         });
         Modal.show('cbc-skin-modal');
@@ -329,6 +391,8 @@ const ChessBoardComponent = {
         }, options.config || {});
         this.onComplete = options.onComplete || null;
         this.containerEl = options.containerEl || 'cbc-container';
+        this._fullscreen = options.fullscreen !== false; // Default: fullscreen ON
+        this._puzzleTheme = options.theme || this.pgnSource?.puzzle_set?.theme || null;
 
         this.playMode = this.pgnSource?.puzzle_set?.play_mode || 'first';
         if (this.config.playerGoesFirst === false) this.playMode = 'second';
@@ -371,6 +435,11 @@ const ChessBoardComponent = {
             }
         }
 
+        // In fullscreen mode, create a full-screen overlay container
+        if (this._fullscreen) {
+            this._createFullscreenOverlay();
+        }
+
         this.render();
         this._showStartScreen();
 
@@ -382,6 +451,52 @@ const ChessBoardComponent = {
         if (container) {
             const modalContent = container.closest('.modal-content');
             if (modalContent) modalContent.classList.add('has-chessboard');
+        }
+    },
+
+    _createFullscreenOverlay() {
+        // Remove existing
+        const existing = document.getElementById('cbc-fullscreen-overlay');
+        if (existing) existing.remove();
+
+        // Create full-screen overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'cbc-fullscreen-overlay';
+        overlay.className = 'cbc-fullscreen-overlay';
+
+        // Close button
+        overlay.innerHTML = `
+            <button class="cbc-fs-close" onclick="ChessBoardComponent._exitFullscreen()">×</button>
+            <div id="cbc-fs-container" class="cbc-fs-container"></div>
+        `;
+        document.body.appendChild(overlay);
+        document.body.classList.add('cbc-no-scroll');
+        this.containerEl = 'cbc-fs-container';
+    },
+
+    _exitFullscreen() {
+        // End session and clean up
+        this.sessionActive = false;
+        clearInterval(this._timerInterval);
+        if (this.memoryTimer) clearInterval(this.memoryTimer);
+        document.body.classList.remove('cbc-memory-hidden');
+        document.body.classList.remove('cbc-no-scroll');
+
+        const overlay = document.getElementById('cbc-fullscreen-overlay');
+        if (overlay) overlay.remove();
+        const startOverlay = document.getElementById('cbc-start-overlay');
+        if (startOverlay) startOverlay.remove();
+
+        if (this.board) { this.board.destroy(); this.board = null; }
+
+        if (this.onComplete) {
+            this.onComplete({
+                solved: false,
+                puzzlesSolved: this.sessionPuzzlesSolved,
+                puzzlesFailed: this.sessionPuzzlesFailed,
+                eloChange: this.sessionEloChange,
+                totalTime: Math.round((Date.now() - this.sessionStartTime) / 1000)
+            });
         }
     },
 
@@ -1461,6 +1576,11 @@ const ChessBoardComponent = {
     },
 
     _fireComplete() {
+        // Clean up fullscreen overlay
+        document.body.classList.remove('cbc-no-scroll');
+        const fsOverlay = document.getElementById('cbc-fullscreen-overlay');
+        if (fsOverlay) fsOverlay.remove();
+
         if (this.onComplete) {
             // Only mark as solved if session completed successfully (not focus_fail/memory_fail)
             const isComplete = this._sessionEndReason === 'complete';
@@ -1587,5 +1707,9 @@ const ChessBoardComponent = {
         this.sessionActive = false;
         this._clearAnnotations();
         document.body.classList.remove('cbc-memory-hidden');
+        document.body.classList.remove('cbc-no-scroll');
+
+        const fsOverlay = document.getElementById('cbc-fullscreen-overlay');
+        if (fsOverlay) fsOverlay.remove();
     }
 };

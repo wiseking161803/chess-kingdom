@@ -185,6 +185,8 @@ const PuzzlePage = {
             pgnSource: this._pendingSet,
             mode: this.selectedMode,
             isEloRated: isEloRated,
+            fullscreen: true,
+            theme: this._pendingSet.puzzle_set?.theme || null,
             config: {
                 playerGoesFirst: this._pendingSet.puzzle_set.play_mode !== 'second',
                 memoryTimeSec: 8,

@@ -273,33 +273,26 @@ const TowerPage = {
             const data = await API.get(`/puzzles/sets/${puzzleSetId}`);
             const solveMode = data.puzzle_set?.solve_mode || 'basic';
 
-            Modal.create({
-                id: 'tower-puzzle-modal',
-                title: 'Nhiệm Vụ Leo Tháp',
-                icon: '🏰',
-                size: 'modal-lg',
-                content: '<div id="tower-cbc-container"></div>'
-            });
-            Modal.show('tower-puzzle-modal');
-
+            // Use fullscreen immersive mode — no modal needed
             ChessBoardComponent.mount({
                 pgnSource: data,
                 mode: solveMode,
                 isEloRated: true,
+                fullscreen: true,
+                theme: data.puzzle_set?.theme || null,
                 config: {
                     playerGoesFirst: data.puzzle_set.play_mode !== 'second',
                     memoryTimeSec: 8,
                     maxMistakes: 3
                 },
                 onComplete: async (result) => {
-                    Modal.hide('tower-puzzle-modal');
                     if (result.solved) {
                         await this.completeTask(taskId);
-                    } else {
+                    } else if (result.puzzlesSolved > 0) {
                         Toast.info('Hãy thử lại nhé! 💪');
                     }
                 },
-                containerEl: 'tower-cbc-container'
+                containerEl: 'cbc-container'
             });
         } catch (err) {
             Toast.error(err.message);

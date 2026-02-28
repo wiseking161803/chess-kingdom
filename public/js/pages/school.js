@@ -128,33 +128,26 @@ const SchoolPage = {
         try {
             const data = await API.get(`/puzzles/sets/${puzzleSetId}`);
 
-            Modal.create({
-                id: 'school-puzzle-modal',
-                title: 'Nhiệm Vụ Bài Tập',
-                icon: '🧩',
-                size: 'modal-lg',
-                content: '<div id="school-cbc-container"></div>'
-            });
-            Modal.show('school-puzzle-modal');
-
+            // Use fullscreen immersive mode
             ChessBoardComponent.mount({
                 pgnSource: data,
                 mode: mode || 'basic',
                 isEloRated: true,
+                fullscreen: true,
+                theme: data.puzzle_set?.theme || null,
                 config: {
                     playerGoesFirst: data.puzzle_set.play_mode !== 'second',
                     memoryTimeSec: 8,
                     maxMistakes: 3
                 },
                 onComplete: async (result) => {
-                    Modal.hide('school-puzzle-modal');
                     if (result.solved) {
                         await this.completeQuest(questId);
-                    } else {
+                    } else if (result.puzzlesSolved > 0) {
                         Toast.info('Hãy thử lại lần sau nhé! 💪');
                     }
                 },
-                containerEl: 'school-cbc-container'
+                containerEl: 'cbc-container'
             });
         } catch (err) {
             Toast.error(err.message);
