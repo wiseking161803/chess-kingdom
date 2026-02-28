@@ -2649,48 +2649,38 @@ textarea {
     z-index: 150;
 }
 
-/* Memory mode: hide pieces on the board but NOT the floating dragged piece */
-/* Uses #cbc-board ID + data-piece attribute — class names may vary by chessboardjs version */
-#cbc-board.cbc-pieces-hidden img[data-piece] {
+/* Chessground board sizing — CRITICAL: chessground requires explicit dimensions */
+#cbc-board {
+    width: 100%;
+    padding-bottom: 100%;
+    /* 1:1 aspect ratio */
+    position: relative;
+}
+
+#cbc-board .cg-wrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Memory mode: hide pieces on the board (chessground uses <piece> elements) */
+#cbc-board.cbc-pieces-hidden .cg-wrap piece {
     opacity: 0 !important;
     visibility: hidden !important;
     transition: none !important;
 }
 
-/* Dragged piece (floating/absolute/fixed position) should ALWAYS be visible */
-/* chessboardjs appends dragged piece to body or uses inline styles */
-img.piece-417db[style*="position: absolute"][style*="z-index"],
-img[data-piece][style*="position: absolute"],
-img[data-piece][style*="position:absolute"],
-img[data-piece][style*="position: fixed"],
-img[data-piece][style*="position:fixed"],
-body>img[data-piece] {
-    opacity: 1 !important;
-    visibility: visible !important;
-    z-index: 11000 !important;
-}
-
-/* Memory hidden mode: ALSO hide dragged/floating pieces so drag doesn't reveal piece identity */
-body.cbc-memory-hidden>img[data-piece],
-body.cbc-memory-hidden img.piece-417db[style*="position: absolute"],
-body.cbc-memory-hidden img[data-piece][style*="position: absolute"],
-body.cbc-memory-hidden img[data-piece][style*="position:absolute"] {
+/* Dragged/ghost piece — also hidden in memory hidden mode */
+body.cbc-memory-hidden .cg-wrap piece.dragging,
+body.cbc-memory-hidden .cg-wrap piece.ghost,
+body.cbc-memory-hidden .cg-wrap piece {
     opacity: 0 !important;
     visibility: hidden !important;
 }
 
-/* Smooth piece movement — improved easing */
-#cbc-board img {
-    transition: none;
-}
-
-#cbc-board img[data-piece] {
-    transition: top 0.2s cubic-bezier(0.25, 0.1, 0.25, 1),
-        left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
-    will-change: top, left;
-}
-
-/* Fix: chessboard.js dragged piece renders behind modal overlay */
+/* Fix: chessboard dragged piece renders behind modal overlay */
 .modal-content.has-chessboard {
     overflow: visible !important;
 }
@@ -2699,7 +2689,7 @@ body.cbc-memory-hidden img[data-piece][style*="position:absolute"] {
     overflow: visible !important;
 }
 
-/* Ensure ALL ancestor containers of the chessboard allow overflow for dragged pieces */
+/* Ensure ALL ancestor containers of the chessboard allow overflow */
 .modal-overlay {
     overflow: visible !important;
 }
@@ -2708,13 +2698,7 @@ body.cbc-memory-hidden img[data-piece][style*="position:absolute"] {
     overflow: visible !important;
 }
 
-/* Dragged piece from chessboard.js — must be above modal z-index (1000) */
-body>img[style*="position: absolute"][style*="z-index"],
-body>img[style*="position:absolute"] {
-    z-index: 11000 !important;
-}
-
-/* Chessboard.js board container inside modal needs high z-index too */
+/* Chessground board container inside modal needs high z-index */
 .modal-overlay #cbc-board,
 .modal-overlay [id$="-cbc-container"] {
     z-index: 1001;
@@ -4183,15 +4167,11 @@ body>img[style*="position:absolute"] {
         -webkit-overflow-scrolling: touch;
     }
 
-    /* Chessboard auto-resize */
+    /* Chessground auto-resize */
     .board-container,
     #cbc-board-container {
         max-width: 90vw;
         margin: 0 auto;
-    }
-
-    .board-b72b1d {
-        max-width: 100% !important;
     }
 
     /* Cards grid */
@@ -4285,7 +4265,7 @@ body>img[style*="position:absolute"] {
         font-size: 0.7rem;
     }
 
-    /* Chessboard */
+    /* Chessground */
     .board-container,
     #cbc-board-container {
         max-width: 95vw;

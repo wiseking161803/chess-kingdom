@@ -231,16 +231,18 @@ const ChessBoardComponent = {
         if (!skin) return;
         this.currentSkin = skinKey;
         localStorage.setItem('chess_board_skin', skinKey);
-        // Apply colors via CSS custom properties on board wrapper
         const wrapper = document.querySelector('.cbc-wrapper');
         if (wrapper) {
             wrapper.style.setProperty('--board-light', skin.light);
             wrapper.style.setProperty('--board-dark', skin.dark);
             wrapper.style.setProperty('--board-bg', skin.bg);
         }
-        // Override chessboardjs square colors
-        document.querySelectorAll('#cbc-board .white-1e1d7').forEach(el => el.style.backgroundColor = skin.light);
-        document.querySelectorAll('#cbc-board .black-3c85d').forEach(el => el.style.backgroundColor = skin.dark);
+        // Apply to chessground board via CSS custom properties
+        const cgBoard = document.querySelector('#cbc-board cg-board');
+        if (cgBoard) {
+            cgBoard.style.setProperty('--cg-light', skin.light);
+            cgBoard.style.setProperty('--cg-dark', skin.dark);
+        }
     },
 
     _applyCurrentSkin() {
@@ -282,13 +284,25 @@ const ChessBoardComponent = {
     },
 
     _preloadPieceImages() {
-        if (this._pieceImagesLoaded) return;
-        const pieces = ['wK', 'wQ', 'wR', 'wB', 'wN', 'wP', 'bK', 'bQ', 'bR', 'bB', 'bN', 'bP'];
-        pieces.forEach(p => {
-            const img = new Image();
-            img.src = `https://chessboardjs.com/img/chesspieces/wikipedia/${p}.png`;
-        });
+        // Chessground uses CSS background-image for pieces — no preload needed
         this._pieceImagesLoaded = true;
+    },
+
+    // Helper: get legal moves as chessground Dests map
+    _getLegalDests() {
+        const dests = new Map();
+        const moves = this.game.moves({ verbose: true });
+        moves.forEach(m => {
+            if (!dests.has(m.from)) dests.set(m.from, []);
+            dests.get(m.from).push(m.to);
+        });
+        return dests;
+    },
+
+    // Helper: convert chess.js FEN pieces to chessground pieces map
+    _fenToPieces(fen) {
+        // Chessground reads pieces from FEN automatically via cg.set({fen})
+        // No manual conversion needed
     },
 
     // ═════════════════════════════════════════
@@ -566,27 +580,58 @@ const ChessBoardComponent = {
         if (arrowLayer) arrowLayer.innerHTML = '';
         this._setMemoryHidden(false);
 
-        // Build board with smooth animation
+        // Build chessground board
+        const boardEl = document.getElementById('cbc-board');
+        if (!boardEl) return;
+
+        const playerSide = this.playerColor === 'white' ? 'w' : 'b';
+        const turnColor = this.game.turn() === 'w' ? 'white' : 'black';
+        const canMove = turnColor === this.playerColor;
+
         if (this.board) this.board.destroy();
-        this.board = Chessboard('cbc-board', {
-            position: puzzle.fen,
+        boardEl.innerHTML = ''; // Clear previous board
+
+        this.board = Chessground(boardEl, {
+            fen: puzzle.fen,
             orientation: this.playerColor,
-            draggable: true,
-            dropOffBoard: 'snapback',
-            moveSpeed: 150,
-            snapbackSpeed: 100,
-            snapSpeed: 80,
-            appearSpeed: 150,
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-            onDragStart: (source, piece) => this._onDragStart(source, piece),
-            onDrop: (source, target) => this._onDrop(source, target),
-            onSnapEnd: () => this._onSnapEnd()
+            turnColor: turnColor,
+            movable: {
+                free: false,
+                color: this.playerColor,
+                dests: canMove ? this._getLegalDests() : new Map(),
+                showDests: true,
+                events: {
+                    after: (orig, dest) => this._onPlayerMove(orig, dest)
+                }
+            },
+            draggable: {
+                enabled: true,
+                showGhost: true
+            },
+            selectable: {
+                enabled: true
+            },
+            highlight: {
+                lastMove: true,
+                check: true
+            },
+            animation: {
+                enabled: true,
+                duration: 150
+            },
+            drawable: {
+                enabled: false,
+                visible: true,
+                autoShapes: [],
+                brushes: {
+                    purple: { key: 'purple', color: '#8e44ad', opacity: 0.8, lineWidth: 10 }
+                }
+            },
+            premovable: {
+                enabled: false
+            },
+            coordinates: true
         });
-
-        // Setup click-to-move via mousedown on the board element
-        this._setupClickToMove();
-
-        window.addEventListener('resize', () => this.board && this.board.resize());
 
         // MODE-SPECIFIC INIT
         if (this.mode === 'memory') {
@@ -597,163 +642,49 @@ const ChessBoardComponent = {
     },
 
     // ═════════════════════════════════════════
-    // BOARD INTERACTION — Drag + Click-to-move
-    // Drag: handled by chessboardjs onDragStart/onDrop
-    // Click: mousedown on own piece → select, mousedown on target → move
+    // BOARD INTERACTION — Chessground handles drag + click natively
+    // This callback fires AFTER chessground has already moved the piece visually
     // ═════════════════════════════════════════
-    _onDragStart(source, piece) {
-        if (!this.sessionActive) return false;
-        if (this.game.game_over()) return false;
-        if (this.waitingForOpponent) return false;
-        if (this.memoryPhase === 'memorize') return false;
-
-        const currentTurn = this.game.turn();
-        const playerSide = this.playerColor === 'white' ? 'w' : 'b';
-        if (currentTurn !== playerSide) return false;
-        if (playerSide === 'w' && piece.startsWith('b')) return false;
-        if (playerSide === 'b' && piece.startsWith('w')) return false;
-
-        // Clear previous selection when starting a new drag
-        this._clearHighlights();
-        this.selectedSquare = null;
-        this.legalMoves = [];
-        return true;
+    _onPlayerMove(orig, dest) {
+        if (!this.sessionActive) return;
+        if (this.waitingForOpponent) return;
+        if (this._isAutoPlaying) return;
+        // Chessground already moved piece visually; now validate with chess.js
+        this._tryMove(orig, dest);
     },
 
-    _onDrop(source, target) {
-        // Case 1: Piece dropped on same square = select it for click-to-move
-        if (source === target) {
-            const playerSide = this.playerColor === 'white' ? 'w' : 'b';
-            this._clearHighlights();
-
-            if (this.selectedSquare === source) {
-                // Deselect
-                this.selectedSquare = null;
-                this.legalMoves = [];
-            } else {
-                // Select this piece
-                this._selectSquare(source, playerSide);
+    // Update chessground board state from chess.js
+    _updateBoard() {
+        if (!this.board) return;
+        const turnColor = this.game.turn() === 'w' ? 'white' : 'black';
+        const canMove = turnColor === this.playerColor;
+        this.board.set({
+            fen: this.game.fen(),
+            turnColor: turnColor,
+            check: this.game.in_check() ? turnColor : false,
+            movable: {
+                color: this.playerColor,
+                dests: canMove ? this._getLegalDests() : new Map()
             }
-            return 'snapback';
-        }
-
-        // Case 2: Normal drag-to-move
-        this._clearHighlights();
-        this.selectedSquare = null;
-        this.legalMoves = [];
-        return this._tryMove(source, target);
-    },
-
-    _onSnapEnd() {
-        if (this.board) {
-            this.board.position(this.game.fen());
-        }
-    },
-
-    _setupClickToMove() {
-        const boardEl = document.getElementById('cbc-board');
-        if (!boardEl) return;
-
-        // Remove old listener
-        if (this._clickMoveHandler) boardEl.removeEventListener('mousedown', this._clickMoveHandler);
-        if (this._clickMoveTouchHandler) boardEl.removeEventListener('touchstart', this._clickMoveTouchHandler);
-
-        // mousedown handler — when a square is clicked and we already have a selected piece
-        this._clickMoveHandler = (e) => {
-            if (!this.selectedSquare) return;  // No piece selected, let chessboardjs handle it
-            if (!this.sessionActive) return;
-            if (this.waitingForOpponent) return;
-
-            const sq = this._getSquareFromEvent(e);
-            if (!sq) return;
-            if (sq === this.selectedSquare) return;  // Will be handled by onDrop
-
-            const playerSide = this.playerColor === 'white' ? 'w' : 'b';
-            const piece = this.game.get(sq);
-
-            // If clicking on another own piece, let chessboardjs drag handle it
-            // (its onDrop will re-select)
-            if (piece && piece.color === playerSide) return;
-
-            // If clicking on a legal target, make the move
-            if (this.legalMoves.includes(sq)) {
-                e.preventDefault();
-                e.stopPropagation();
-                const from = this.selectedSquare;
-                this._clearHighlights();
-                this.selectedSquare = null;
-                this.legalMoves = [];
-                this._tryMove(from, sq);
-            } else {
-                // Invalid target, clear selection
-                this._clearHighlights();
-                this.selectedSquare = null;
-                this.legalMoves = [];
-            }
-        };
-
-        this._clickMoveTouchHandler = (e) => {
-            if (!this.selectedSquare) return;
-            if (!this.sessionActive) return;
-
-            const touch = e.touches?.[0];
-            if (!touch) return;
-            const el = document.elementFromPoint(touch.clientX, touch.clientY);
-            const sqEl = el?.closest('[data-square]');
-            const sq = sqEl?.getAttribute('data-square');
-            if (!sq || sq === this.selectedSquare) return;
-
-            const playerSide = this.playerColor === 'white' ? 'w' : 'b';
-            const piece = this.game.get(sq);
-            if (piece && piece.color === playerSide) return;
-
-            if (this.legalMoves.includes(sq)) {
-                e.preventDefault();
-                e.stopPropagation();
-                const from = this.selectedSquare;
-                this._clearHighlights();
-                this.selectedSquare = null;
-                this.legalMoves = [];
-                this._tryMove(from, sq);
-            } else {
-                this._clearHighlights();
-                this.selectedSquare = null;
-                this.legalMoves = [];
-            }
-        };
-
-        // Use capture phase to intercept before chessboardjs
-        boardEl.addEventListener('mousedown', this._clickMoveHandler, true);
-        boardEl.addEventListener('touchstart', this._clickMoveTouchHandler, { capture: true, passive: false });
-    },
-
-    _getSquareFromEvent(e) {
-        const el = e.target?.closest?.('[data-square]');
-        return el?.getAttribute('data-square') || null;
-    },
-
-    _selectSquare(square, playerSide) {
-        this.selectedSquare = square;
-        this.legalMoves = this.game.moves({ square: square, verbose: true }).map(m => m.to);
-
-        this._highlightSquare(square, 'cbc-highlight-selected');
-        // Memory hidden mode: only highlight selected square, don't show legal moves (would reveal piece identity)
-        if (this.mode === 'memory' && this.memoryPhase === 'hidden') return;
-        this.legalMoves.forEach(sq => this._highlightSquare(sq, 'cbc-highlight-move'));
-    },
-
-    _highlightSquare(square, className) {
-        const boardEl = document.getElementById('cbc-board');
-        if (!boardEl) return;
-        const squareEl = boardEl.querySelector(`[data-square="${square}"]`);
-        if (squareEl) squareEl.classList.add(className);
-    },
-
-    _clearHighlights() {
-        document.querySelectorAll('.cbc-highlight-selected, .cbc-highlight-move').forEach(el => {
-            el.classList.remove('cbc-highlight-selected', 'cbc-highlight-move');
         });
     },
+
+    // Disable board interaction temporarily
+    _lockBoard() {
+        if (!this.board) return;
+        this.board.set({ movable: { color: undefined, dests: new Map() } });
+    },
+
+    // Re-enable board interaction for player
+    _unlockBoard() {
+        if (!this.board) return;
+        const turnColor = this.game.turn() === 'w' ? 'white' : 'black';
+        const canMove = turnColor === this.playerColor;
+        this.board.set({
+            movable: { color: this.playerColor, dests: canMove ? this._getLegalDests() : new Map() }
+        });
+    },
+
 
     // ═════════════════════════════════════════
     // NORMAL PLAY (Basic, Focus)
@@ -867,90 +798,35 @@ const ChessBoardComponent = {
     },
 
     _drawArrow(from, to, color) {
-        color = color || 'rgba(243, 156, 18, 0.8)';
-        const arrowLayer = document.getElementById('cbc-arrow-layer');
-        const boardEl = document.getElementById('cbc-board');
-        if (!arrowLayer || !boardEl) return;
-
-        const boardRect = boardEl.getBoundingClientRect();
-        const squareSize = boardRect.width / 8;
-        const getCenter = (sq) => {
-            let col = sq.charCodeAt(0) - 97;
-            let row = 8 - parseInt(sq[1]);
-            if (this.playerColor === 'black') { col = 7 - col; row = 7 - row; }
-            return { x: (col + 0.5) * squareSize, y: (row + 0.5) * squareSize };
-        };
-
-        // Reuse or create SVG
-        let svg = arrowLayer.querySelector('svg');
-        if (!svg) {
-            svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('width', boardRect.width);
-            svg.setAttribute('height', boardRect.height);
-            svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:100;';
-            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-            svg.appendChild(defs);
-            arrowLayer.appendChild(svg);
-        }
-
-        const markerId = 'cbc-ah-' + Math.random().toString(36).substr(2, 6);
-        const defs = svg.querySelector('defs');
-        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-        marker.setAttribute('id', markerId);
-        marker.setAttribute('markerWidth', '7');
-        marker.setAttribute('markerHeight', '5');
-        marker.setAttribute('refX', '6');
-        marker.setAttribute('refY', '2.5');
-        marker.setAttribute('orient', 'auto');
-        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        polygon.setAttribute('points', '0 0, 7 2.5, 0 5');
-        polygon.setAttribute('fill', color);
-        marker.appendChild(polygon);
-        defs.appendChild(marker);
-
-        const fromPos = getCenter(from);
-        const toPos = getCenter(to);
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', fromPos.x);
-        line.setAttribute('y1', fromPos.y);
-        line.setAttribute('x2', toPos.x);
-        line.setAttribute('y2', toPos.y);
-        line.setAttribute('stroke', color);
-        line.setAttribute('stroke-width', '3');
-        line.setAttribute('stroke-opacity', '0.8');
-        line.setAttribute('stroke-linecap', 'round');
-        line.setAttribute('marker-end', `url(#${markerId})`);
-        line.classList.add('cbc-arrow-anim');
-        svg.appendChild(line);
+        // Use chessground native drawable API
+        if (!this.board) return;
+        const brush = color === 'rgba(46, 204, 113, 0.8)' ? 'green' :
+            color === 'rgba(46, 204, 113, 0.5)' ? 'green' :
+                color === 'rgba(142, 68, 173, 0.85)' ? 'purple' : 'yellow';
+        // Get current shapes and add new one
+        const currentShapes = this._currentAutoShapes || [];
+        currentShapes.push({ orig: from, dest: to, brush: brush });
+        this._currentAutoShapes = currentShapes;
+        this.board.set({ drawable: { autoShapes: currentShapes } });
     },
 
     _drawSquareHighlight(square, color) {
-        color = color || 'rgba(235, 97, 80, 0.45)';
-        const arrowLayer = document.getElementById('cbc-arrow-layer');
-        const boardEl = document.getElementById('cbc-board');
-        if (!arrowLayer || !boardEl) return;
-
-        const boardRect = boardEl.getBoundingClientRect();
-        const squareSize = boardRect.width / 8;
-        let col = square.charCodeAt(0) - 97;
-        let row = 8 - parseInt(square[1]);
-        if (this.playerColor === 'black') { col = 7 - col; row = 7 - row; }
-
-        const div = document.createElement('div');
-        div.className = 'cbc-sq-highlight';
-        div.style.cssText = `position:absolute;left:${col * squareSize}px;top:${row * squareSize}px;width:${squareSize}px;height:${squareSize}px;background:${color};pointer-events:none;z-index:99;border-radius:2px;`;
-        arrowLayer.appendChild(div);
+        // Use chessground native drawable API
+        if (!this.board) return;
+        const brush = color === 'rgba(46, 204, 113, 0.5)' ? 'green' :
+            color === 'rgba(235, 97, 80, 0.45)' ? 'red' : 'yellow';
+        const currentShapes = this._currentAutoShapes || [];
+        currentShapes.push({ orig: square, brush: brush });
+        this._currentAutoShapes = currentShapes;
+        this.board.set({ drawable: { autoShapes: currentShapes } });
     },
 
     _clearAnnotations() {
-        const arrowLayer = document.getElementById('cbc-arrow-layer');
-        if (arrowLayer) arrowLayer.innerHTML = '';
-    },
-
-    /**
-     * Clear all visual annotations (arrows, highlights) from the arrow layer
-     */
-    _clearAnnotations() {
+        this._currentAutoShapes = [];
+        if (this.board) {
+            this.board.set({ drawable: { autoShapes: [] } });
+        }
+        // Also clear legacy arrow layer if present
         const arrowLayer = document.getElementById('cbc-arrow-layer');
         if (arrowLayer) arrowLayer.innerHTML = '';
     },
@@ -961,11 +837,22 @@ const ChessBoardComponent = {
     drawAnnotations(moveNode) {
         this._clearAnnotations();
         if (!moveNode) return;
+        const shapes = [];
         if (moveNode.arrows) {
-            moveNode.arrows.forEach(a => this._drawArrow(a.from, a.to, a.color));
+            moveNode.arrows.forEach(a => {
+                const brush = a.color === 'green' ? 'green' : a.color === 'red' ? 'red' : 'yellow';
+                shapes.push({ orig: a.from, dest: a.to, brush: brush });
+            });
         }
         if (moveNode.highlights) {
-            moveNode.highlights.forEach(h => this._drawSquareHighlight(h.square, h.color));
+            moveNode.highlights.forEach(h => {
+                const brush = h.color === 'green' ? 'green' : h.color === 'red' ? 'red' : 'yellow';
+                shapes.push({ orig: h.square, brush: brush });
+            });
+        }
+        this._currentAutoShapes = shapes;
+        if (this.board) {
+            this.board.set({ drawable: { autoShapes: shapes } });
         }
     },
 
@@ -985,8 +872,7 @@ const ChessBoardComponent = {
 
     _onMemoryMove(solved) {
         if (solved) {
-            const arrowLayer = document.getElementById('cbc-arrow-layer');
-            if (arrowLayer) arrowLayer.innerHTML = '';
+            this._clearAnnotations();
         } else {
             this.memoryMistakes++;
             const el = document.getElementById('cbc-memory-mistakes');
@@ -999,44 +885,20 @@ const ChessBoardComponent = {
         }
     },
 
-    // ═════════════════════════════════════════
-    // DRAG HANDLERS
-    // ═════════════════════════════════════════
-    onDragStart(source, piece) {
-        if (!this.sessionActive) return false;
-        if (this.game.game_over()) return false;
-        if (this.waitingForOpponent) return false;
-        if (this.memoryPhase === 'memorize') return false;
 
-        const currentTurn = this.game.turn();
-        const playerSide = this.playerColor === 'white' ? 'w' : 'b';
-        if (currentTurn !== playerSide) return false;
-        if (playerSide === 'w' && piece.startsWith('b')) return false;
-        if (playerSide === 'b' && piece.startsWith('w')) return false;
-        return true;
-    },
-
-    onDrop(source, target) {
-        // Clear click-to-move state
-        this.selectedSquare = null;
-        this.legalMoves = [];
-        this._clearHighlights();
-
-        return this._tryMove(source, target);
-    },
 
     _tryMove(source, target) {
-        if (this.waitingForOpponent) return 'snapback';
-        if (!this.sessionActive) return 'snapback';
-        if (this._isAutoPlaying) return 'snapback';
+        if (this.waitingForOpponent) { this._updateBoard(); return; }
+        if (!this.sessionActive) { this._updateBoard(); return; }
+        if (this._isAutoPlaying) { this._updateBoard(); return; }
 
         const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
         const currentMoves = this._isInVariation ? this._variationStack[this._variationStack.length - 1]?.variationMoves : puzzle.solution_moves;
         const node = currentMoves?.[this.currentMoveIndex];
-        if (!node) return 'snapback';
+        if (!node) { this._updateBoard(); return; }
 
         const move = this.game.move({ from: source, to: target, promotion: 'q' });
-        if (move === null) return 'snapback';
+        if (move === null) { this._updateBoard(); return; }
 
         this.attempts++;
         this._clearAnnotations();
@@ -1063,7 +925,7 @@ const ChessBoardComponent = {
             }
 
             this.currentMoveIndex++;
-            this.board.position(this.game.fen());
+            this._updateBoard();
 
             if (this.mode === 'memory') this._onMemoryMove(true);
 
@@ -1136,7 +998,7 @@ const ChessBoardComponent = {
                         });
                         this._isInVariation = true;
                         this.currentMoveIndex = 1; // Skip first move (player already played it)
-                        this.board.position(this.game.fen());
+                        this._updateBoard();
 
                         // Show annotations
                         if (firstVarNode.arrows?.length || firstVarNode.highlights?.length) {
@@ -1178,7 +1040,7 @@ const ChessBoardComponent = {
                 varInfo.classList.remove('hidden');
             }
             this.currentMoveIndex++;
-            this.board.position(this.game.fen());
+            this._updateBoard();
             if (this.mode === 'memory') this._onMemoryMove(true);
             if (this.currentMoveIndex >= currentMoves.length) {
                 this._onPuzzleSolved();
@@ -1201,6 +1063,7 @@ const ChessBoardComponent = {
 
         // WRONG MOVE — no match anywhere
         this.game.undo();
+        this._updateBoard(); // Resync board after undo
         this.playSound('wrong');
         this._reportWrongMove();
         this._madeWrongMove = true;
@@ -1216,8 +1079,6 @@ const ChessBoardComponent = {
             this._setStatus('Sai rồi, thử lại! ❌', 'var(--danger)');
             setTimeout(() => this._setStatus('Đến lượt bạn đi!', ''), 1500);
         }
-
-        return 'snapback';
     },
 
     /**
@@ -1239,7 +1100,7 @@ const ChessBoardComponent = {
                 this._isAutoPlaying = false;
                 this.game.load(startFen);
                 this.game.undo(); // Back to before player's move
-                this.board.position(this.game.fen());
+                this._updateBoard();
                 this._setStatus('↩ Quay lại tìm nước hay hơn!', '#3498db');
                 if (varInfo) varInfo.classList.add('hidden');
                 this._clearAnnotations();
@@ -1250,7 +1111,7 @@ const ChessBoardComponent = {
             try {
                 const result = this.game.move(vNode.move);
                 if (result) {
-                    this.board.position(this.game.fen());
+                    this._updateBoard();
                     this.playSound(result.captured ? 'capture' : 'move');
                     this._showMoveComment(vNode);
                 }
@@ -1279,7 +1140,7 @@ const ChessBoardComponent = {
         const restoreFen = this._getFenAtMoveIndex(puzzle, ctx.moveIndex);
         if (restoreFen) {
             this.game.load(restoreFen);
-            this.board.position(this.game.fen());
+            this._updateBoard();
         }
 
         this.currentMoveIndex = ctx.moveIndex;
@@ -1326,7 +1187,7 @@ const ChessBoardComponent = {
 
         try {
             const moveResult = this.game.move(node.move);
-            this.board.position(this.game.fen());
+            this._updateBoard();
             this.currentMoveIndex++;
             // Store opponent move for arrow display in memory mode
             if (moveResult) {
@@ -1683,6 +1544,7 @@ const ChessBoardComponent = {
         if (this._timerInterval) clearInterval(this._timerInterval);
         if (this.memoryTimer) clearInterval(this.memoryTimer);
         this.sessionActive = false;
-        this._clearHighlights();
+        this._clearAnnotations();
+        document.body.classList.remove('cbc-memory-hidden');
     }
 };
