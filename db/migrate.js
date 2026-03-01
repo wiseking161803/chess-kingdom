@@ -492,6 +492,21 @@ async function migrate() {
         console.log('  ✅ Added theme to puzzle_sets');
     } catch (e) { if (e.code !== 'ER_DUP_FIELDNAME') throw e; }
 
+    // Story progress tracking
+    await conn.query(`
+        CREATE TABLE IF NOT EXISTS story_progress (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            chapter_id INT NOT NULL,
+            scene_index INT NOT NULL DEFAULT 0,
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE KEY unique_user_chapter_scene (user_id, chapter_id, scene_index),
+            INDEX idx_user_chapter (user_id, chapter_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('  ✅ Created story_progress table');
+
     console.log('✅ All tables created successfully!');
     await conn.end();
 }

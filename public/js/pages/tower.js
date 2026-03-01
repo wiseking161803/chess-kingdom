@@ -253,10 +253,31 @@ const TowerPage = {
                 this._showLevelUpCeremony(result);
             }
         } catch (err) {
-            Toast.error(err.message || err.error || 'Lỗi thăng cấp');
+            const errorData = err;
+            // Check if story completion is needed
+            if (errorData.needs_story) {
+                Toast.warning(errorData.error || errorData.message);
+                // Offer to open story
+                setTimeout(() => {
+                    if (confirm('Bạn muốn mở truyện ngay không?')) {
+                        this.openStory(errorData.chapter_id);
+                    }
+                }, 500);
+            } else {
+                Toast.error(err.message || err.error || 'Lỗi thăng cấp');
+            }
             const btn = document.querySelector('.tower-promote-btn');
             if (btn) { btn.disabled = false; btn.textContent = '🎯 Yêu Cầu Thăng Cấp'; }
         }
+    },
+
+    openStory(chapterId) {
+        StoryViewer.open(chapterId, {
+            onComplete: () => {
+                // Reload tower data after story ends
+                this.loadData();
+            }
+        });
     },
 
     _showLevelUpCeremony(result) {
@@ -320,6 +341,9 @@ const TowerPage = {
                         <h2 class="tower-detail-title">${m.title}</h2>
                         ${m.description ? `<div class="tower-detail-desc">${m.description}</div>` : ''}
                     </div>
+                    <button class="btn btn-sm" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:0.8rem;font-weight:700;cursor:pointer;flex-shrink:0" onclick="TowerPage.openStory(${m.sort_order + 1})">
+                        📖 Xem Truyện
+                    </button>
                 </div>
 
                 <div class="tower-detail-progress">

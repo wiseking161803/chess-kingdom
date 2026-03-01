@@ -1,0 +1,561 @@
+{
+  "chapter_id": 1,
+  "title": "Bọc Trăm Trứng",
+  "icon": "🌱",
+  "era": "Thời Hồng Bàng (~2879 TCN)",
+  "rewards": {
+    "stars": 50,
+    "collection": "Truyền thuyết Con Rồng Cháu Tiên",
+    "item": "Huy hiệu Khai Nguyên",
+    "item_icon": "🏅"
+  },
+  "bgm_mood": "mystical",
+  "scenes": [
+    {
+      "id": "scene_01_intro",
+      "background": "chess_classroom",
+      "background_image": "/img/story/backgrounds/chess_classroom.png",
+      "vfx": "sparkle",
+      "characters": [
+        {
+          "id": "su_phu",
+          "position": "center",
+          "emotion": "neutral"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "Một buổi chiều bình thường tại lớp học cờ vua..."
+        },
+        {
+          "char": "su_phu",
+          "emotion": "neutral",
+          "text": "{player}, con hãy đến đây. Ta có điều muốn nói."
+        },
+        {
+          "char": "su_phu",
+          "emotion": "smile",
+          "text": "Con có thấy bàn cờ phía trước không? Hãy nhìn thật kỹ đi."
+        },
+        {
+          "char": "narrator",
+          "text": "Bàn cờ bỗng phát ra ánh sáng xanh dịu, từng chữ cổ xưa hiện lên trên mặt gỗ..."
+        },
+        {
+          "char": "su_phu",
+          "emotion": "serious",
+          "text": "Đây không phải bàn cờ thường, {player}. Đây là Bàn Cờ Thần Kỳ — bảo vật ngàn năm của dân tộc Đại Việt."
+        }
+      ]
+    },
+    {
+      "id": "scene_02_legend",
+      "background": "chess_classroom",
+      "background_image": "/img/story/backgrounds/chess_classroom.png",
+      "characters": [
+        {
+          "id": "su_phu",
+          "position": "center",
+          "emotion": "serious"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "su_phu",
+          "emotion": "serious",
+          "text": "Bên trong bàn cờ này, có 18 trang sử vĩ đại đang bị phong ấn bởi thế lực đen tối — Thế Lực Hắc Kỳ."
+        },
+        {
+          "char": "su_phu",
+          "emotion": "determined",
+          "text": "Hắc Kỳ Đại Đế — chúa tể quân Đen — muốn xóa sạch ký ức lịch sử Đại Việt khỏi tâm trí mọi người."
+        },
+        {
+          "char": "su_phu",
+          "emotion": "smile",
+          "text": "Nhưng ta tin rằng con — {player} — chính là người được chọn để giải phóng chúng!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "teaching",
+          "text": "Mỗi trang sử tương ứng với một tầng của Tháp Kỳ Vương. Con phải dùng trí tuệ cờ vua để đánh bại kẻ thù ở mỗi tầng."
+        }
+      ],
+      "choices": [
+        {
+          "text": "🔥 Con sẵn sàng chiến đấu!",
+          "response": [
+            {
+              "char": "su_phu",
+              "emotion": "happy",
+              "text": "Tuyệt vời! Tinh thần dũng cảm! Để ta bắt đầu kể cho con nghe câu chuyện đầu tiên..."
+            }
+          ]
+        },
+        {
+          "text": "😅 Nhưng con chỉ là người mới học cờ thôi...",
+          "response": [
+            {
+              "char": "su_phu",
+              "emotion": "gentle",
+              "text": "Mọi Đại Kỳ Vương đều bắt đầu từ con Tốt nhỏ bé, {player}. Hãy tin vào bản thân mình."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scene_03_origin",
+      "background": "mythical_sea_mountain",
+      "background_image": "/img/story/backgrounds/mythical_sea_mountain.png",
+      "vfx": "sparkle",
+      "bgm_mood": "peaceful",
+      "characters": [],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "Ánh sáng từ Bàn Cờ Thần Kỳ bao trùm lấy {player}, đưa em trở về thời hồng hoang..."
+        },
+        {
+          "char": "narrator",
+          "text": "Hàng ngàn năm trước, khi trời đất còn mới, vùng đất Lĩnh Nam xinh đẹp trải dài từ núi cao đến biển rộng."
+        },
+        {
+          "char": "narrator",
+          "text": "Nơi đây, thần Rồng Lạc Long Quân — con trai Long Nữ dưới đáy biển sâu — canh giữ muôn dân."
+        }
+      ]
+    },
+    {
+      "id": "scene_04_lac_long_quan",
+      "background": "ocean_shore",
+      "background_image": "/img/story/backgrounds/ocean_shore.png",
+      "bgm_mood": "epic",
+      "characters": [
+        {
+          "id": "lac_long_quan",
+          "position": "center",
+          "emotion": "proud"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "Lạc Long Quân ngự ở biển Đông, có sức mạnh phi thường, thông thạo 72 phép biến hóa."
+        },
+        {
+          "char": "lac_long_quan",
+          "emotion": "proud",
+          "text": "Ta là con của biển cả! Nơi nào có yêu quái hại dân, nơi đó có ta!"
+        },
+        {
+          "char": "narrator",
+          "text": "Ngài đã diệt Ngư Tinh ở biển, Hồ Tinh ở hồ, Mộc Tinh ở rừng, bảo vệ dân lành khỏi tai ương."
+        },
+        {
+          "char": "lac_long_quan",
+          "emotion": "determined",
+          "text": "Dân ta phải sống trong bình yên. Đó là sứ mệnh mà Cha ta — Long Vương — trao cho ta."
+        }
+      ]
+    },
+    {
+      "id": "scene_05_au_co",
+      "background": "mythical_sea_mountain",
+      "background_image": "/img/story/backgrounds/mythical_sea_mountain.png",
+      "bgm_mood": "peaceful",
+      "characters": [
+        {
+          "id": "lac_long_quan",
+          "position": "left",
+          "emotion": "gentle"
+        },
+        {
+          "id": "au_co",
+          "position": "right",
+          "emotion": "gentle"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "Một ngày, nàng Âu Cơ — tiên nữ xinh đẹp từ vùng núi Ngũ Lĩnh — đi du ngoạn phương Nam."
+        },
+        {
+          "char": "au_co",
+          "emotion": "gentle",
+          "text": "Cảnh đẹp quá! Vùng đất này thật kỳ diệu, cây cối tốt tươi, chim hót líu lo..."
+        },
+        {
+          "char": "narrator",
+          "text": "Lạc Long Quân và Âu Cơ gặp nhau bên bờ sông, tình yêu nảy nở..."
+        },
+        {
+          "char": "lac_long_quan",
+          "emotion": "gentle",
+          "text": "Nàng là tiên từ núi, ta là rồng từ biển. Chúng ta khác nhau, nhưng tình yêu không có ranh giới."
+        },
+        {
+          "char": "au_co",
+          "emotion": "happy",
+          "text": "Thiếp nguyện ở bên chàng, cùng chàng bảo vệ muôn dân."
+        }
+      ]
+    },
+    {
+      "id": "scene_06_hundred_eggs",
+      "background": "hundred_eggs",
+      "background_image": "/img/story/backgrounds/hundred_eggs.png",
+      "vfx": "sparkle",
+      "characters": [
+        {
+          "id": "au_co",
+          "position": "center",
+          "emotion": "happy"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "Âu Cơ mang thai và sinh ra một bọc trăm trứng! Điều kỳ diệu chưa từng có!"
+        },
+        {
+          "char": "au_co",
+          "emotion": "happy",
+          "text": "Hãy nhìn! Một trăm quả trứng! Mỗi quả đều phát sáng!"
+        },
+        {
+          "char": "narrator",
+          "text": "Từ trăm quả trứng nở ra trăm người con — khỏe mạnh, thông minh, xinh đẹp."
+        },
+        {
+          "char": "narrator",
+          "text": "Đây chính là tổ tiên của dân tộc Việt — con Rồng, cháu Tiên!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "teaching",
+          "text": "Nghe hay không, {player}? Giống như 8 quân Tốt trên bàn cờ — tuy nhỏ bé nhưng tiềm năng vô hạn!"
+        }
+      ]
+    },
+    {
+      "id": "scene_07_first_puzzle",
+      "background": "training_grounds",
+      "background_image": "/img/story/backgrounds/training_grounds.png",
+      "characters": [
+        {
+          "id": "su_phu",
+          "position": "center",
+          "emotion": "teaching"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "su_phu",
+          "emotion": "teaching",
+          "text": "Giờ đến phần quan trọng, {player}! Con cần luyện tập cờ vua để tích lũy sức mạnh!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "teaching",
+          "text": "Quân Tốt — giống như 100 người con của Lạc Long Quân — dù nhỏ bé nhưng có thể trở thành Hậu!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "smile",
+          "text": "Hãy giải thế cờ đầu tiên nào!"
+        }
+      ],
+      "puzzle_set_id": 4,
+      "puzzle_intro": "🎯 Nhiệm vụ: Giải thế cờ cơ bản!"
+    },
+    {
+      "id": "scene_08_separation",
+      "background": "ocean_shore",
+      "background_image": "/img/story/backgrounds/ocean_shore.png",
+      "characters": [
+        {
+          "id": "lac_long_quan",
+          "position": "left",
+          "emotion": "sad"
+        },
+        {
+          "id": "au_co",
+          "position": "right",
+          "emotion": "sad"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "Nhưng rồng thuộc về biển, tiên thuộc về núi. Hai người không thể ở cùng nhau mãi mãi..."
+        },
+        {
+          "char": "lac_long_quan",
+          "emotion": "sad",
+          "text": "Nàng ơi, ta nhớ biển cả, gió mặn, sóng vỗ... Ta không thể sống xa biển."
+        },
+        {
+          "char": "au_co",
+          "emotion": "sad",
+          "text": "Thiếp cũng nhớ núi rừng, mây trắng, suối trong... Vậy phải làm sao?"
+        },
+        {
+          "char": "lac_long_quan",
+          "emotion": "determined",
+          "text": "50 con theo ta xuống biển. 50 con theo nàng lên núi. Chúng ta sẽ cai quản hai miền đất nước."
+        },
+        {
+          "char": "au_co",
+          "emotion": "determined",
+          "text": "Dù xa cách, chúng ta vĩnh viễn là một gia đình. Khi nào gặp hoạn nạn, hãy giúp đỡ lẫn nhau!"
+        }
+      ]
+    },
+    {
+      "id": "scene_09_van_lang",
+      "background": "ancient_village",
+      "background_image": "/img/story/backgrounds/ancient_village.png",
+      "characters": [],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "50 người con theo Âu Cơ lên vùng đất Phong Châu, lập nên nước Văn Lang."
+        },
+        {
+          "char": "narrator",
+          "text": "Người con trưởng lên ngôi, xưng là Hùng Vương — vị vua đầu tiên của dân tộc Việt!"
+        },
+        {
+          "char": "narrator",
+          "text": "Dân Văn Lang trồng lúa nước, đánh cá, đúc trống đồng — nền văn minh rực rỡ!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "proud",
+          "text": "Một thời đại huy hoàng, {player}! 18 đời Hùng Vương cai trị trong 2621 năm!"
+        }
+      ]
+    },
+    {
+      "id": "scene_10_second_puzzle",
+      "background": "training_grounds",
+      "background_image": "/img/story/backgrounds/training_grounds.png",
+      "characters": [
+        {
+          "id": "su_phu",
+          "position": "center",
+          "emotion": "teaching"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "su_phu",
+          "emotion": "teaching",
+          "text": "Quốc gia hùng mạnh nhờ đoàn kết. Trên bàn cờ cũng vậy — các quân phải phối hợp!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "teaching",
+          "text": "Hãy học cách dùng quân Mã — cưỡi ngựa như kỵ sĩ Văn Lang!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "smile",
+          "text": "Tiếp tục giải puzzle nào, {player}!"
+        }
+      ],
+      "puzzle_set_id": 4,
+      "puzzle_intro": "🐴 Nhiệm vụ: Học cách sử dụng quân Mã!"
+    },
+    {
+      "id": "scene_11_darkness_comes",
+      "background": "dark_forest",
+      "background_image": "/img/story/backgrounds/dark_forest.png",
+      "vfx": "dark",
+      "bgm_mood": "dark",
+      "characters": [
+        {
+          "id": "su_phu",
+          "position": "left",
+          "emotion": "worried"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "Bỗng nhiên, bầu trời tối sầm lại. Bóng tối bao trùm Bàn Cờ Thần Kỳ!",
+          "vfx": "shake"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "worried",
+          "text": "{player}, cẩn thận! Thế Lực Hắc Kỳ đang tấn công trang sử này!"
+        },
+        {
+          "char": "moc_tinh",
+          "emotion": "menacing",
+          "text": "HAHAHA! Ta đã chờ rất lâu! Trang sử 'Con Rồng Cháu Tiên' sẽ bị ta xóa sổ!",
+          "characters": [
+            {
+              "id": "su_phu",
+              "position": "left",
+              "emotion": "worried"
+            },
+            {
+              "id": "moc_tinh",
+              "position": "right",
+              "emotion": "menacing"
+            }
+          ]
+        },
+        {
+          "char": "su_phu",
+          "emotion": "serious",
+          "text": "Đó là Mộc Tinh! Yêu quái cây khổng lồ mà Lạc Long Quân đã từng đánh bại!"
+        },
+        {
+          "char": "moc_tinh",
+          "emotion": "angry",
+          "text": "Lần này không có Lạc Long Quân cứu các ngươi! Ta sẽ phong ấn trang sử này vĩnh viễn!"
+        }
+      ]
+    },
+    {
+      "id": "scene_12_preparation",
+      "background": "training_grounds",
+      "background_image": "/img/story/backgrounds/training_grounds.png",
+      "characters": [
+        {
+          "id": "su_phu",
+          "position": "center",
+          "emotion": "determined"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "su_phu",
+          "emotion": "determined",
+          "text": "{player}, ta không thể đánh Mộc Tinh thay con được. Nhưng ta sẽ truyền cho con sức mạnh cuối cùng!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "teaching",
+          "text": "Hãy học thêm một chiến thuật nữa — cách dùng quân Xe để tấn công mạnh mẽ!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "serious",
+          "text": "Giải những thế cờ này để tích đủ năng lượng đánh boss!"
+        }
+      ],
+      "puzzle_set_id": null,
+      "puzzle_intro": "🏰 Nhiệm vụ: Học chiến thuật quân Xe!"
+    },
+    {
+      "id": "scene_13_boss_battle",
+      "background": "boss_arena",
+      "background_image": "/img/story/backgrounds/boss_arena.png",
+      "vfx": "dark",
+      "bgm_mood": "epic",
+      "characters": [
+        {
+          "id": "su_phu",
+          "position": "left",
+          "emotion": "encouraging"
+        },
+        {
+          "id": "moc_tinh",
+          "position": "right",
+          "emotion": "angry"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "moc_tinh",
+          "emotion": "angry",
+          "text": "Ngươi dám thách thức ta, {player}?! Một đứa trẻ mới học cờ?!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "encouraging",
+          "text": "Đừng sợ, {player}! Nhớ lời Lạc Long Quân: 'Đoàn kết là sức mạnh lớn nhất!'"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "encouraging",
+          "text": "Phối hợp các quân cờ — Tốt tiến lên, Mã nhảy bọc, Xe xông pha! Hãy chiến đấu!"
+        },
+        {
+          "char": "moc_tinh",
+          "emotion": "angry",
+          "text": "NHẬN LẤY! Trận cờ cuối cùng!"
+        }
+      ],
+      "puzzle_set_id": null,
+      "puzzle_intro": "⚔️ BOSS BATTLE: Đánh bại Mộc Tinh!"
+    },
+    {
+      "id": "scene_14_victory",
+      "background": "golden_victory",
+      "background_image": "/img/story/backgrounds/golden_victory.png",
+      "vfx": "sparkle",
+      "bgm_mood": "peaceful",
+      "characters": [
+        {
+          "id": "lac_long_quan",
+          "position": "left",
+          "emotion": "proud"
+        },
+        {
+          "id": "au_co",
+          "position": "right",
+          "emotion": "happy"
+        }
+      ],
+      "dialogues": [
+        {
+          "char": "narrator",
+          "text": "Mộc Tinh bị đánh bại! Ánh sáng vàng rực rỡ phá tan bóng tối!"
+        },
+        {
+          "char": "narrator",
+          "text": "Trang sử đầu tiên — 'Con Rồng Cháu Tiên' — đã được giải phóng!"
+        },
+        {
+          "char": "lac_long_quan",
+          "emotion": "proud",
+          "text": "Giỏi lắm, {player}! Con đã dùng trí tuệ để cứu ký ức thiêng liêng nhất của dân tộc!"
+        },
+        {
+          "char": "au_co",
+          "emotion": "happy",
+          "text": "Hãy nhớ bài học này: dù khác biệt, chúng ta mãi là một gia đình. Đoàn kết là sức mạnh!"
+        },
+        {
+          "char": "su_phu",
+          "emotion": "proud",
+          "text": "Chương đầu tiên hoàn thành! Nhưng còn 17 trang sử nữa đang chờ, {player}...",
+          "characters": [
+            {
+              "id": "su_phu",
+              "position": "center",
+              "emotion": "proud"
+            }
+          ]
+        },
+        {
+          "char": "su_phu",
+          "emotion": "smile",
+          "text": "Hãy tiếp tục luyện tập, tích lũy sao ⭐, và chinh phục tầng tiếp theo!"
+        },
+        {
+          "char": "narrator",
+          "text": "Một âm thanh vang lên từ xa... Tiếng trống đồng Văn Lang đang gọi {player} đến cuộc phiêu lưu tiếp theo!"
+        }
+      ]
+    }
+  ]
+}

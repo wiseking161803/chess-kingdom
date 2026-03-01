@@ -22,6 +22,7 @@ const AdminPage = {
                 <button class="tab" onclick="AdminPage.switchTab('puzzles', this)">♟️ Puzzle</button>
                 <button class="tab" onclick="AdminPage.switchTab('milestones', this)">⛰️ Milestones</button>
                 <button class="tab" onclick="AdminPage.switchTab('quests', this)">📝 Nhiệm Vụ</button>
+                <button class="tab" onclick="AdminPage.switchTab('story', this)">📖 Cốt Truyện</button>
                 <button class="tab" onclick="AdminPage.switchTab('requests', this)">📋 Yêu Cầu</button>
                 <button class="tab" onclick="AdminPage.switchTab('rewards', this)">🎁 Trao Thưởng</button>
                 <button class="tab" onclick="AdminPage.switchTab('payments', this)">💰 Thanh Toán</button>
@@ -52,6 +53,7 @@ const AdminPage = {
             case 'puzzles': await this.loadPuzzles(container); break;
             case 'milestones': await this.loadMilestones(container); break;
             case 'quests': await this.loadQuests(container); break;
+            case 'story': await this.loadStory(container); break;
             case 'requests': await this.loadRequests(container); break;
             case 'rewards': this.loadRewards(container); break;
             case 'payments': await this.loadPayments(container); break;
@@ -1501,5 +1503,151 @@ const AdminPage = {
         } catch (err) {
             Toast.error(err.message);
         }
+    },
+
+    // ============ STORY MANAGEMENT ============
+
+    _storyChapters: [],
+    _availablePuzzleSets: [],
+
+    async loadStory(container) {
+        try {
+            // Load available puzzle sets for assignment dropdowns
+            try {
+                const psData = await API.get('/puzzles/sets');
+                this._availablePuzzleSets = psData.puzzle_sets || psData.sets || [];
+            } catch (e) { this._availablePuzzleSets = []; }
+
+            // Load chapter files (try ch1-ch18)
+            this._storyChapters = [];
+            const loadPromises = [];
+            for (let i = 1; i <= 18; i++) {
+                loadPromises.push(
+                    fetch(`/data/chapters/ch${i}.json`)
+                        .then(r => r.ok ? r.json() : null)
+                        .catch(() => null)
+                );
+            }
+            const results = await Promise.all(loadPromises);
+            results.forEach((ch, i) => {
+                if (ch) this._storyChapters.push(ch);
+            });
+
+            // Build UI
+            let html = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 style="margin:0">📖 Quản Lý Cốt Truyện</h3>
+                    <div style="font-size:0.8rem;color:rgba(255,255,255,0.5)">
+                        ${this._storyChapters.length}/18 chương đã tạo
+                    </div>
+                </div>
+                <div style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:0.8rem;color:rgba(255,255,255,0.7)">
+                    <strong>💡 Hướng dẫn:</strong> Mỗi chương tương ứng 1 tầng tháp. Các cảnh có biểu tượng 🧩 là cảnh puzzle — admin có thể gán bộ puzzle cho cảnh đó. File chapter nằm tại <code>public/data/chapters/ch{N}.json</code>.
+                </div>
+            `;
+
+            if (this._storyChapters.length === 0) {
+                html += `<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.4)">Chưa có chương truyện nào. Tạo file ch1.json trong thư mục data/chapters/</div>`;
+            }
+
+            for (const ch of this._storyChapters) {
+                const totalScenes = ch.scenes?.length || 0;
+                const puzzleScenes = ch.scenes?.filter(s => s.puzzle_set_id !== undefined) || [];
+                const assignedPuzzles = puzzleScenes.filter(s => s.puzzle_set_id !== null).length;
+
+                html += `
+                    <div class="story-admin-chapter" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:12px;margin-bottom:12px;overflow:hidden">
+                        <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.story-arrow').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'"
+                             style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background 0.2s"
+                             onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background=''">
+                            <span style="font-size:2rem">${ch.icon || '📖'}</span>
+                            <div style="flex:1;min-width:0">
+                                <div style="font-weight:700;font-size:0.95rem">Chương ${ch.chapter_id}: ${ch.title}</div>
+                                <div style="font-size:0.75rem;color:rgba(255,255,255,0.4)">${ch.era || ''}</div>
+                            </div>
+                            <div style="text-align:right;font-size:0.75rem;color:rgba(255,255,255,0.5)">
+                                <div>${totalScenes} cảnh</div>
+                                <div>${puzzleScenes.length} puzzle (${assignedPuzzles} đã gán)</div>
+                            </div>
+                            <span class="story-arrow" style="font-size:0.8rem;color:rgba(255,255,255,0.3)">▶</span>
+                        </div>
+                        <div style="display:none;border-top:1px solid rgba(255,255,255,0.08)">
+                            ${ch.scenes.map((s, idx) => {
+                    const isPuzzle = s.puzzle_set_id !== undefined;
+                    const bgColor = isPuzzle ? 'rgba(245,158,11,0.08)' : 'rgba(0,0,0,0.1)';
+                    const borderColor = isPuzzle ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.05)';
+
+                    let puzzleHtml = '';
+                    if (isPuzzle) {
+                        const options = this._availablePuzzleSets.map(ps =>
+                            `<option value="${ps.id}" ${ps.id === s.puzzle_set_id ? 'selected' : ''}>${ps.name} (${ps.puzzle_count || '?'} puzzles)</option>`
+                        ).join('');
+                        puzzleHtml = `
+                                        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                            <span style="font-size:0.7rem;color:#f59e0b;font-weight:600">🧩 Puzzle:</span>
+                                            <select id="story-puzzle-ch${ch.chapter_id}-s${idx}" style="flex:1;min-width:120px;padding:4px 8px;border-radius:6px;background:rgba(0,0,0,0.4);border:1px solid rgba(245,158,11,0.3);color:#fff;font-size:0.75rem">
+                                                <option value="">— Chưa gán —</option>
+                                                ${options}
+                                            </select>
+                                            <button onclick="AdminPage.assignStoryPuzzle(${ch.chapter_id}, ${idx})" style="padding:4px 10px;border-radius:6px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;color:#fff;font-size:0.7rem;font-weight:600;cursor:pointer">💾 Lưu</button>
+                                        </div>
+                                        <div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:4px">${s.puzzle_intro || ''}</div>
+                                    `;
+                    }
+
+                    return `
+                                    <div style="padding:10px 16px;background:${bgColor};border-bottom:1px solid ${borderColor}">
+                                        <div style="display:flex;align-items:center;gap:8px">
+                                            <span style="font-size:0.7rem;color:rgba(255,255,255,0.3);font-weight:600;min-width:32px">S${idx + 1}</span>
+                                            <span style="font-size:0.75rem;font-weight:600">${isPuzzle ? '🧩' : '💬'} ${s.id}</span>
+                                            <span style="font-size:0.7rem;color:rgba(255,255,255,0.35);margin-left:auto">${s.dialogues?.length || 0} lời thoại${s.choices ? ' + lựa chọn' : ''}</span>
+                                        </div>
+                                        ${puzzleHtml}
+                                    </div>
+                                `;
+                }).join('')}
+                            <div style="padding:12px 16px;background:rgba(0,0,0,0.15);display:flex;justify-content:space-between;align-items:center">
+                                <div style="font-size:0.75rem;color:rgba(255,255,255,0.4)">
+                                    🎁 Phần thưởng: ${ch.rewards?.stars ? `⭐+${ch.rewards.stars}` : '—'} ${ch.rewards?.item ? `| ${ch.rewards.item_icon || '🎁'} ${ch.rewards.item}` : ''}
+                                </div>
+                                <button onclick="AdminPage.previewStory(${ch.chapter_id})" style="padding:4px 12px;border-radius:6px;background:rgba(139,92,246,0.2);border:1px solid rgba(139,92,246,0.4);color:#a78bfa;font-size:0.7rem;cursor:pointer;font-weight:600">
+                                    👁️ Xem thử
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+        } catch (err) {
+            container.innerHTML = `<div style="color:#ef4444">❌ Lỗi: ${err.message}</div>`;
+        }
+    },
+
+    async assignStoryPuzzle(chapterId, sceneIndex) {
+        const select = document.getElementById(`story-puzzle-ch${chapterId}-s${sceneIndex}`);
+        if (!select) return;
+
+        const puzzleSetId = select.value ? parseInt(select.value) : null;
+
+        try {
+            // Save to backend
+            await API.post('/gamification/story/assign-puzzle', {
+                chapter_id: chapterId,
+                scene_index: sceneIndex,
+                puzzle_set_id: puzzleSetId
+            });
+            Toast.success(`✅ Đã gán puzzle cho Chương ${chapterId}, Cảnh ${sceneIndex + 1}!`);
+
+            // Reload to reflect changes
+            this._storyChapters = []; // Force re-fetch
+        } catch (err) {
+            Toast.error(err.message || 'Lỗi gán puzzle');
+        }
+    },
+
+    previewStory(chapterId) {
+        StoryViewer.open(chapterId);
     }
 };

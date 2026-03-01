@@ -280,6 +280,35 @@ router.post('/request-levelup', authenticate, async (req, res) => {
             }
         }
 
+        // Check if story is completed for current floor
+        const currentMilestoneSortOrder = currentLevel; // current floor sort_order
+        try {
+            const [storyCheck] = await db.query(
+                'SELECT COUNT(DISTINCT scene_index) as scenes_done FROM story_progress WHERE user_id = ? AND chapter_id = ?',
+                [userId, currentMilestoneSortOrder + 1] // chapter_id = floor number (1-based)
+            );
+            // Load chapter data to check total scenes
+            const fs = require('fs');
+            const path = require('path');
+            const chapterFile = path.join(__dirname, '..', 'public', 'data', 'chapters', `ch${currentMilestoneSortOrder + 1}.json`);
+            if (fs.existsSync(chapterFile)) {
+                const chData = JSON.parse(fs.readFileSync(chapterFile, 'utf8'));
+                const totalScenes = chData.scenes?.length || 0;
+                const scenesDone = storyCheck[0]?.scenes_done || 0;
+                if (totalScenes > 0 && scenesDone < totalScenes) {
+                    return res.status(400).json({
+                        error: `📖 Cần hoàn thành cốt truyện Chương ${currentMilestoneSortOrder + 1} trước! (${scenesDone}/${totalScenes} cảnh)`,
+                        needs_story: true,
+                        chapter_id: currentMilestoneSortOrder + 1,
+                        scenes_done: scenesDone,
+                        scenes_total: totalScenes
+                    });
+                }
+            }
+        } catch (e) {
+            // Story check failed — allow level-up anyway
+        }
+
         // All checks passed — promote user!
         await db.query(
             'UPDATE users SET rank_level = ?, current_rank = ? WHERE id = ?',
@@ -296,6 +325,160 @@ router.post('/request-levelup', authenticate, async (req, res) => {
     } catch (err) {
         console.error('Level up error:', err);
         res.status(500).json({ error: 'Lỗi thăng cấp' });
+    }
+});
+
+// ============================================
+// STORY SYSTEM
+// ============================================
+
+/**
+ * GET /api/gamification/story/progress/:chapterId — Get user's story progress
+ * Returns scenes completed + whether user can view next scene today
+ */
+router.get('/story/progress/:chapterId', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const chapterId = parseInt(req.params.chapterId);
+
+        // Get completed scenes
+        const [scenes] = await db.query(
+            'SELECT scene_index, completed_at FROM story_progress WHERE user_id = ? AND chapter_id = ? ORDER BY scene_index',
+            [userId, chapterId]
+        );
+
+        // Check if user already viewed a scene today
+        const [todayScene] = await db.query(
+            'SELECT id FROM story_progress WHERE user_id = ? AND chapter_id = ? AND DATE(completed_at) = CURDATE()',
+            [userId, chapterId]
+        );
+        const viewedToday = todayScene.length > 0;
+
+        // Check streak — user must have completed daily tasks
+        const [streak] = await db.query(
+            'SELECT current_streak, last_activity_date FROM user_streaks WHERE user_id = ?',
+            [userId]
+        );
+        const hasStreak = streak.length > 0 && streak[0].current_streak > 0;
+        const lastActivity = streak[0]?.last_activity_date;
+        const today = new Date().toISOString().split('T')[0];
+        const streakActiveToday = lastActivity && new Date(lastActivity).toISOString().split('T')[0] === today;
+
+        // Can view next scene = has streak today + hasn't viewed today yet
+        // First scene (index 0) is always free — no gate
+        const nextSceneIndex = scenes.length;
+        const canViewNext = nextSceneIndex === 0 || (!viewedToday && (hasStreak || streakActiveToday));
+
+        res.json({
+            chapter_id: chapterId,
+            scenes_completed: scenes.map(s => s.scene_index),
+            next_scene: nextSceneIndex,
+            can_view_next: canViewNext,
+            viewed_today: viewedToday,
+            has_streak: hasStreak || streakActiveToday,
+            gate_reason: !canViewNext
+                ? (viewedToday ? 'Hôm nay bạn đã xem 1 cảnh rồi! Quay lại ngày mai nhé 🌅' :
+                    'Hãy hoàn thành nhiệm vụ hôm nay để giữ streak trước! 🔥')
+                : null
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Lỗi lấy tiến trình truyện' });
+    }
+});
+
+/**
+ * POST /api/gamification/story/scene-complete — Mark a scene as completed
+ * Enforces 1 scene/day + streak gate (except first scene)
+ */
+router.post('/story/scene-complete', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { chapter_id, scene_index } = req.body;
+
+        // Gate check for scene > 0 (first scene is always free)
+        if (scene_index > 0) {
+            // Check if already viewed a different scene today
+            const [todayScene] = await db.query(
+                'SELECT id FROM story_progress WHERE user_id = ? AND chapter_id = ? AND DATE(completed_at) = CURDATE() AND scene_index != ?',
+                [userId, chapter_id, scene_index]
+            );
+            if (todayScene.length > 0) {
+                return res.status(429).json({ error: 'Hôm nay bạn đã xem cảnh mới rồi! Quay lại ngày mai 🌅' });
+            }
+        }
+
+        // Save progress (ignore if already completed)
+        await db.query(
+            'INSERT IGNORE INTO story_progress (user_id, chapter_id, scene_index) VALUES (?,?,?)',
+            [userId, chapter_id, scene_index]
+        );
+
+        res.json({ success: true, chapter_id, scene_index });
+    } catch (err) {
+        res.status(500).json({ error: 'Lỗi lưu tiến trình' });
+    }
+});
+
+/**
+ * POST /api/gamification/story/complete — Mark chapter as fully completed
+ * Awards bonus stars
+ */
+router.post('/story/complete', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { chapter_id } = req.body;
+
+        // Check if already rewarded
+        const [existing] = await db.query(
+            "SELECT id FROM user_task_completions WHERE user_id = ? AND task_type = 'story' AND task_id = ?",
+            [userId, chapter_id]
+        );
+        if (existing.length > 0) {
+            return res.json({ success: true, already_completed: true });
+        }
+
+        // Award bonus stars
+        const bonusStars = 50;
+        await db.query(
+            'INSERT INTO user_task_completions (user_id, task_id, task_type, stars_earned) VALUES (?,?,?,?)',
+            [userId, chapter_id, 'story', bonusStars]
+        );
+        await db.query(
+            'UPDATE user_currencies SET knowledge_stars = knowledge_stars + ?, total_stars_earned = total_stars_earned + ? WHERE user_id = ?',
+            [bonusStars, bonusStars, userId]
+        );
+
+        res.json({ success: true, stars_earned: bonusStars });
+    } catch (err) {
+        res.status(500).json({ error: 'Lỗi hoàn thành chương' });
+    }
+});
+
+/**
+ * POST /api/gamification/story/assign-puzzle — Admin: assign puzzle set to a story scene
+ */
+router.post('/story/assign-puzzle', authenticate, requireAdmin, async (req, res) => {
+    try {
+        const { chapter_id, scene_index, puzzle_set_id } = req.body;
+        const fs = require('fs');
+        const path = require('path');
+        const chapterFile = path.join(__dirname, '..', 'public', 'data', 'chapters', `ch${chapter_id}.json`);
+
+        if (!fs.existsSync(chapterFile)) {
+            return res.status(404).json({ error: `Không tìm thấy file ch${chapter_id}.json` });
+        }
+
+        const chData = JSON.parse(fs.readFileSync(chapterFile, 'utf8'));
+        if (!chData.scenes || scene_index >= chData.scenes.length) {
+            return res.status(400).json({ error: 'Scene index không hợp lệ' });
+        }
+
+        chData.scenes[scene_index].puzzle_set_id = puzzle_set_id;
+        fs.writeFileSync(chapterFile, JSON.stringify(chData, null, 2), 'utf8');
+
+        res.json({ success: true, message: `Đã gán puzzle set ${puzzle_set_id} cho scene ${scene_index}` });
+    } catch (err) {
+        res.status(500).json({ error: 'Lỗi gán puzzle: ' + err.message });
     }
 });
 

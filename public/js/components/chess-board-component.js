@@ -419,8 +419,8 @@ const ChessBoardComponent = {
         // Preload piece images
         this._preloadPieceImages();
 
-        // Focus mode: ALWAYS start from puzzle 1
-        if (this.mode === 'focus') {
+        // Focus mode or startFromZero: ALWAYS start from puzzle 1
+        if (this.mode === 'focus' || options.startFromZero) {
             this.currentPuzzleIdx = 0;
         } else {
             // Find first unsolved puzzle
@@ -660,11 +660,27 @@ const ChessBoardComponent = {
         return fenTurn === 'white' ? 'black' : 'white';
     },
 
+    // Helper: normalize solution node — handles both string "Qf1+" and object {move:"Qf1+"}
+    _getNode(movesArray, index) {
+        const raw = movesArray?.[index];
+        if (!raw) return null;
+        return typeof raw === 'string' ? { move: raw } : raw;
+    },
+
     loadPuzzle() {
         if (!this.pgnSource?.puzzles?.[this.currentPuzzleIdx]) return;
         if (!this.sessionActive) return;
 
         const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
+
+        // Normalize solution_moves: convert string nodes to objects { move: "..." }
+        // DB stores as flat strings ["Qf1+","Bxf1"] but code expects objects with .move property
+        if (puzzle.solution_moves && Array.isArray(puzzle.solution_moves)) {
+            puzzle.solution_moves = puzzle.solution_moves.map(node =>
+                typeof node === 'string' ? { move: node } : node
+            );
+        }
+
         this.game = new Chess(puzzle.fen);
         this.currentMoveIndex = 0;
         this.attempts = 0;
@@ -1034,8 +1050,10 @@ const ChessBoardComponent = {
 
         const puzzle = this.pgnSource.puzzles[this.currentPuzzleIdx];
         const currentMoves = this._isInVariation ? this._variationStack[this._variationStack.length - 1]?.variationMoves : puzzle.solution_moves;
-        const node = currentMoves?.[this.currentMoveIndex];
+        let node = currentMoves?.[this.currentMoveIndex];
         if (!node) { this._updateBoard(); return; }
+        // Handle both string and object format solution nodes
+        if (typeof node === 'string') node = { move: node };
 
         const move = this.game.move({ from: source, to: target, promotion: 'q' });
         if (move === null) { this._updateBoard(); return; }
@@ -1047,6 +1065,7 @@ const ChessBoardComponent = {
         const normalize = (san) => san ? san.replace(/[+#!?]/g, '').trim() : '';
         const playerSan = normalize(move.san);
         const mainlineSan = normalize(node.move);
+
 
         // Check mainline match
         if (playerSan === mainlineSan) {
@@ -1611,8 +1630,9 @@ const ChessBoardComponent = {
     getHint() {
         const puzzle = this.pgnSource?.puzzles?.[this.currentPuzzleIdx];
         const currentMoves = this._isInVariation ? this._variationStack[this._variationStack.length - 1]?.variationMoves : puzzle?.solution_moves;
-        const node = currentMoves?.[this.currentMoveIndex];
+        let node = currentMoves?.[this.currentMoveIndex];
         if (!node) return;
+        if (typeof node === 'string') node = { move: node };
 
         this.hintsUsed++;
         const hintEl = document.getElementById('cbc-hints');
